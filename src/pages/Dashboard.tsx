@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { javaLabs, springLabs, labs, projects } from '../content'
 import type { Lab } from '../content/types'
 import { useProgress } from '../state/ProgressContext'
-import { labProgress } from '../lib/ids'
+import { labProgress, projectProgress } from '../lib/ids'
 
 function LabCard({ lab }: { lab: Lab }) {
   const { exercises, reading } = useProgress()
@@ -36,7 +36,7 @@ function LabCard({ lab }: { lab: Lab }) {
 }
 
 export function Dashboard() {
-  const { exercises, reading } = useProgress()
+  const { exercises, reading, tasks } = useProgress()
 
   const totalExercises = labs.reduce((n, l) => n + l.exercises.length, 0)
   const doneExercises = labs.reduce(
@@ -131,22 +131,29 @@ export function Dashboard() {
         </Link>
       </div>
       <div className="grid grid--3">
-        {projects.map((proj) => (
-          <Link key={proj.id} to={`/project/${proj.id}`} className="card card--hover">
-            <div className="lab-card">
-              <span className={`track-tag track-tag--${proj.track}`}>
-                {proj.track === 'spring' ? 'Spring Boot' : 'Core Java'}
-              </span>
-              <div className="lab-card__title" style={{ fontSize: 16 }}>
-                {proj.title}
+        {projects.map((proj) => {
+          const p = projectProgress(proj, tasks)
+          return (
+            <Link key={proj.id} to={`/project/${proj.id}`} className="card card--hover">
+              <div className="lab-card">
+                <span className={`track-tag track-tag--${proj.track}`}>
+                  {proj.track === 'spring' ? 'Spring Boot' : 'Core Java'}
+                </span>
+                <div className="lab-card__title" style={{ fontSize: 16 }}>
+                  {proj.title}
+                </div>
+                <div className="lab-card__sub">{proj.subtitle}</div>
+                <div className={`progress${p.complete ? ' progress--green' : ''}`} style={{ marginTop: 4 }}>
+                  <div className="progress__bar" style={{ width: `${Math.round(p.ratio * 100)}%` }} />
+                </div>
+                <div className="lab-card__meta">
+                  <span>⏱ {proj.estimate}</span>
+                  <span>✅ {p.done}/{p.total}</span>
+                </div>
               </div>
-              <div className="lab-card__sub">{proj.subtitle}</div>
-              <div className="lab-card__meta">
-                <span>⏱ {proj.estimate}</span>
-              </div>
-            </div>
-          </Link>
-        ))}
+            </Link>
+          )
+        })}
       </div>
 
       <p className="muted" style={{ marginTop: 28, fontSize: 13 }}>

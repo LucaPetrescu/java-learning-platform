@@ -193,6 +193,33 @@ button {
   padding-top: 16px;
 }
 
+.sidebar-progress {
+  margin: 12px 4px 4px;
+  padding: 12px 14px;
+  background: var(--panel);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+}
+.sidebar-progress__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+.sidebar-progress__pct {
+  font-family: var(--font-mono);
+  color: var(--accent);
+  font-weight: 750;
+}
+.sidebar-progress__sub {
+  font-size: 11px;
+  color: var(--text-faint);
+  margin-top: 7px;
+}
+
 /* ---- content area ------------------------------------------------------- */
 
 .content {
@@ -836,6 +863,41 @@ h1.page-title {
   font-weight: 750;
   font-family: var(--font-mono);
   font-size: 13px;
+}
+.milestone-num.done {
+  background: var(--green);
+  color: #06210c;
+}
+
+.task-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+.task-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 7px 0;
+  border-top: 1px solid var(--border-soft);
+}
+.task-item:first-child {
+  border-top: none;
+}
+.task-item__text {
+  flex: 1;
+  font-size: 14px;
+}
+.task-item__text .md p {
+  margin: 0;
+}
+.task-item.done .task-item__text {
+  color: var(--text-faint);
+  text-decoration: line-through;
+  text-decoration-color: var(--border);
+}
+.task-item .read-check {
+  margin-top: 1px;
 }
 
 .track-tag {

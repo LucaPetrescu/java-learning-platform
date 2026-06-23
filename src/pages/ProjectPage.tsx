@@ -1,10 +1,13 @@
 import { Link, useParams } from 'react-router-dom'
 import { labById, projectById } from '../content'
 import { Markdown } from '../components/Markdown'
+import { useProgress } from '../state/ProgressContext'
+import { projectProgress, taskId } from '../lib/ids'
 
 export function ProjectPage() {
   const { projectId } = useParams<{ projectId: string }>()
   const project = projectId ? projectById(projectId) : undefined
+  const { tasks, isTaskDone, toggleTask } = useProgress()
 
   if (!project) {
     return (
@@ -16,6 +19,8 @@ export function ProjectPage() {
       </div>
     )
   }
+
+  const p = projectProgress(project, tasks)
 
   return (
     <div>
@@ -31,6 +36,13 @@ export function ProjectPage() {
               {t}
             </span>
           ))}
+        </div>
+        <div className={`progress${p.complete ? ' progress--green' : ''}`} style={{ marginTop: 18 }}>
+          <div className="progress__bar" style={{ width: `${Math.round(p.ratio * 100)}%` }} />
+        </div>
+        <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>
+          {p.complete ? '✓ All milestones complete — ' : ''}
+          {p.done}/{p.total} build tasks done ({Math.round(p.ratio * 100)}%)
         </div>
       </div>
 
@@ -55,21 +67,53 @@ export function ProjectPage() {
       </div>
 
       <h2 className="section-h">Milestones</h2>
-      {project.milestones.map((m, i) => (
-        <div className="card" key={i} style={{ marginBottom: 12 }}>
-          <div className="milestone-head">
-            <span className="milestone-num">{i + 1}</span>
-            <h3 style={{ margin: 0, fontSize: 16 }}>{m.title}</h3>
+      {project.milestones.map((m, i) => {
+        const mDone = m.tasks.filter((_, j) => isTaskDone(taskId(project.id, i, j))).length
+        return (
+          <div className="card" key={i} style={{ marginBottom: 12 }}>
+            <div className="milestone-head">
+              <span className={`milestone-num${mDone === m.tasks.length ? ' done' : ''}`}>
+                {mDone === m.tasks.length ? '✓' : i + 1}
+              </span>
+              <h3 style={{ margin: 0, fontSize: 16, flex: 1 }}>{m.title}</h3>
+              <span className="muted" style={{ fontSize: 12 }}>
+                {mDone}/{m.tasks.length}
+              </span>
+            </div>
+            <div
+              className={`progress${mDone === m.tasks.length ? ' progress--green' : ''}`}
+              style={{ marginTop: 12 }}
+            >
+              <div
+                className="progress__bar"
+                style={{
+                  width: `${m.tasks.length === 0 ? 0 : Math.round((mDone / m.tasks.length) * 100)}%`,
+                }}
+              />
+            </div>
+            <ul className="task-list">
+              {m.tasks.map((t, j) => {
+                const id = taskId(project.id, i, j)
+                const done = isTaskDone(id)
+                return (
+                  <li key={j} className={`task-item${done ? ' done' : ''}`}>
+                    <button
+                      className={`read-check${done ? ' read' : ''}`}
+                      title={done ? 'Done' : 'Mark task done'}
+                      onClick={() => toggleTask(id)}
+                    >
+                      ✓
+                    </button>
+                    <div className="task-item__text">
+                      <Markdown>{t}</Markdown>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
           </div>
-          <ul className="md" style={{ margin: '10px 0 0', paddingLeft: 22 }}>
-            {m.tasks.map((t, j) => (
-              <li key={j} style={{ margin: '5px 0' }}>
-                <Markdown>{t}</Markdown>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
+        )
+      })}
 
       <div className="grid grid--2" style={{ marginTop: 8 }}>
         <div className="card">
