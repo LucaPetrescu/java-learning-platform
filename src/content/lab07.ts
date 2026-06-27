@@ -385,152 +385,178 @@ from a file read is usually not retryable (the file is missing or corrupt).
   ],
   exercises: [
     {
-      id: 'finally-predict',
-      title: 'Spot the bug: finally, suppressed, and swallowed exceptions',
+      id: 'invalid-token-exception',
+      title: 'Design a checked exception: InvalidTokenException + parseInts',
       difficulty: 'warmup',
-      prompt: `Before running anything, **predict the exact output or behaviour** for each
-snippet below. Write a one-line explanation for each prediction. Then run them to
-reconcile surprises.
+      prompt: `Design and implement a **custom checked exception** that carries structured
+context, then use it in a real parsing method.
 
-**Snippet A** — What does this method return, and what happens to the exception?
+**Step 1 — define the exception:**
+
+Create \`class InvalidTokenException extends Exception\` with:
+- fields: \`String token\` (the bad text) and \`int index\` (zero-based position in the array)
+- a constructor \`InvalidTokenException(String token, int index)\` that builds a helpful
+  message such as \`"Token at index 2 is not an integer: \\"abc\\""\`
+- getters \`getToken()\` and \`getIndex()\`
+
+**Step 2 — implement the parser:**
 
 ~~~java
-static String snippet_a() {
-    try {
-        if (true) throw new RuntimeException("boom");
-        return "try";
-    } catch (RuntimeException e) {
-        return "catch";
-    } finally {
-        return "finally";
-    }
-}
-System.out.println(snippet_a());
+static int[] parseInts(String csv) throws InvalidTokenException
 ~~~
 
-**Snippet B** — What propagates from this method?
+- Split \`csv\` on \`","\` (no limit argument needed here).
+- Attempt to parse each token as an integer with \`Integer.parseInt\`.
+- On the **first** non-integer token, throw \`InvalidTokenException\` with the bad token
+  and its zero-based index. Do **not** accumulate errors — fail fast on the first bad token.
+- Return an \`int[]\` of the parsed values if all tokens are valid.
 
-~~~java
-static void snippet_b() {
-    try {
-        throw new IllegalStateException("original");
-    } finally {
-        throw new NullPointerException("in finally");
-    }
-}
-try { snippet_b(); } catch (Exception e) {
-    System.out.println(e.getClass().getSimpleName() + ": " + e.getMessage());
-    System.out.println("cause: " + e.getCause());
-    System.out.println("suppressed count: " + e.getSuppressed().length);
-}
-~~~
+**Step 3 — write \`main\`:**
 
-**Snippet C** — Does try-with-resources behave differently from snippet B for
-the same scenario (body throws + close() throws)?
+Call \`parseInts\` twice and handle the exception:
 
-~~~java
-class Kaboom implements AutoCloseable {
-    @Override public void close() { throw new RuntimeException("close"); }
-}
-try (var k = new Kaboom()) {
-    throw new IllegalStateException("body");
-} catch (IllegalStateException e) {
-    System.out.println("caught: " + e.getMessage());
-    System.out.println("suppressed count: " + e.getSuppressed().length);
-    System.out.println("suppressed[0]: " + e.getSuppressed()[0].getMessage());
-}
+1. \`"1,2,3"\` — should succeed; print the array values on one line.
+2. \`"10,abc,30"\` — should throw; catch \`InvalidTokenException\` and print both
+   \`getIndex()\` and \`getToken()\`.
+
+Expected output:
+
+~~~text
+Parsed: 1 2 3
+Bad token at index 1: "abc"
 ~~~`,
-      starter: `public class FinallyPredict {
+      starter: `public class TokenParser {
 
-    static String snippet_a() {
-        try {
-            if (true) throw new RuntimeException("boom");
-            return "try";
-        } catch (RuntimeException e) {
-            return "catch";
-        } finally {
-            return "finally";
+    /**
+     * Thrown when a comma-separated token cannot be parsed as an integer.
+     * Carries the bad token text and its zero-based index for structured handling.
+     */
+    static class InvalidTokenException extends Exception {
+        private final String token;
+        private final int index;
+
+        public InvalidTokenException(String token, int index) {
+            // TODO: call super() with a message like:
+            //   Token at index <index> is not an integer: "<token>"
+            super("TODO");
+            this.token = token;
+            this.index = index;
         }
+
+        public String getToken() { return token; }
+        public int    getIndex() { return index; }
     }
 
-    static void snippet_b() {
-        try {
-            throw new IllegalStateException("original");
-        } finally {
-            throw new NullPointerException("in finally");
+    /**
+     * Parse a comma-separated string of integers.
+     * Throws InvalidTokenException on the first token that is not a valid integer.
+     */
+    static int[] parseInts(String csv) throws InvalidTokenException {
+        String[] parts = csv.split(",");
+        int[] result = new int[parts.length];
+        for (int i = 0; i < parts.length; i++) {
+            // TODO: try Integer.parseInt(parts[i].trim())
+            //       catch NumberFormatException and throw InvalidTokenException
         }
-    }
-
-    static class Kaboom implements AutoCloseable {
-        @Override public void close() { throw new RuntimeException("close"); }
+        return result;
     }
 
     public static void main(String[] args) {
-        // --- Snippet A ---
-        System.out.println(snippet_a());
-
-        // --- Snippet B ---
+        // Test 1: valid input
         try {
-            snippet_b();
-        } catch (Exception e) {
-            System.out.println(e.getClass().getSimpleName() + ": " + e.getMessage());
-            System.out.println("cause: " + e.getCause());
-            System.out.println("suppressed count: " + e.getSuppressed().length);
+            int[] nums = parseInts("1,2,3");
+            // TODO: print "Parsed: " followed by each number separated by spaces
+        } catch (InvalidTokenException e) {
+            System.out.println("Unexpected error: " + e.getMessage());
         }
 
-        // --- Snippet C ---
-        try (var k = new Kaboom()) {
-            throw new IllegalStateException("body");
-        } catch (IllegalStateException e) {
-            System.out.println("caught: " + e.getMessage());
-            System.out.println("suppressed count: " + e.getSuppressed().length);
-            System.out.println("suppressed[0]: " + e.getSuppressed()[0].getMessage());
+        // Test 2: invalid token
+        try {
+            parseInts("10,abc,30");
+            System.out.println("Should not reach here");
+        } catch (InvalidTokenException e) {
+            // TODO: print:  Bad token at index <index>: "<token>"
         }
     }
 }`,
       hints: [
-        'Snippet A: \`return\` in \`finally\` beats \`return\` in \`catch\`. The exception is silently discarded — this is one of the top "never do this" rules.',
-        'Snippet B: when \`finally\` itself throws, the original exception (\`IllegalStateException\`) is completely lost. Only the \`NullPointerException\` propagates, with no cause and no suppressed list.',
-        'Snippet C is why try-with-resources was invented. The JVM calls \`close()\` and, when it throws, attaches that exception to the body exception as a *suppressed* exception instead of replacing it.',
+        'In the \`InvalidTokenException\` constructor call \`super("Token at index " + index + " is not an integer: \\"" + token + "\\"");\` — the escaped quotes keep the message readable.',
+        'Inside \`parseInts\`, wrap \`Integer.parseInt(parts[i].trim())\` in a try/catch(NumberFormatException). In the catch, throw \`new InvalidTokenException(parts[i].trim(), i)\`.',
+        'In \`main\`, print the array with a loop: \`StringBuilder sb = new StringBuilder("Parsed:");\` then append each number, or use a simple enhanced-for with a flag for the separator.',
       ],
-      solution: `// Snippet A output:
-//   finally
-// Reason: return in finally overrides the return in catch (and discards the exception entirely).
-// The RuntimeException "boom" is caught in catch, which prepares to return "catch",
-// but finally runs next and its own return wins. The exception is gone.
+      solution: `public class TokenParser {
 
-// Snippet B output:
-//   NullPointerException: in finally
-//   cause: null
-//   suppressed count: 0
-// Reason: old-style finally has no mechanism to preserve the original exception when it
-// itself throws. The IllegalStateException is simply discarded and replaced by
-// NullPointerException. No cause, no suppressed — the information is gone.
+    static class InvalidTokenException extends Exception {
+        private final String token;
+        private final int index;
 
-// Snippet C output:
-//   caught: body
-//   suppressed count: 1
-//   suppressed[0]: close
-// Reason: try-with-resources uses Throwable.addSuppressed() internally. The body exception
-// ("body") is the primary and the close() exception ("close") is attached to it as suppressed.
-// Both are preserved — the primary propagates, the suppressed is retrievable via getSuppressed().`,
-      explanation: `These three snippets define the landscape of exception-versus-finally interactions.
+        public InvalidTokenException(String token, int index) {
+            super("Token at index " + index + " is not an integer: \\"" + token + "\\"");
+            this.token = token;
+            this.index = index;
+        }
 
-**A** is the most dangerous: \`return\` (or \`break\`/\`continue\`) in \`finally\` silently drops
-any exception in flight. The compiler does not warn about this. Many static analysis tools do
-flag it — trust the linter.
+        public String getToken() { return token; }
+        public int    getIndex() { return index; }
+    }
 
-**B** is why old-style \`finally\` blocks that might throw are unsafe. If you cannot
-guarantee that your cleanup code never throws, the original exception can vanish. The
-conventional workaround before Java 7 was to log the secondary exception inside a
-nested try/catch inside the finally block and rethrow the original — verbose and
-easy to get wrong.
+    static int[] parseInts(String csv) throws InvalidTokenException {
+        String[] parts = csv.split(",");
+        int[] result = new int[parts.length];
+        for (int i = 0; i < parts.length; i++) {
+            String trimmed = parts[i].trim();
+            try {
+                result[i] = Integer.parseInt(trimmed);
+            } catch (NumberFormatException e) {
+                throw new InvalidTokenException(trimmed, i);
+            }
+        }
+        return result;
+    }
 
-**C** is the entire motivation for try-with-resources: the JVM handles the close call
-internally, catches any exception from it, and attaches it as a suppressed exception
-on the primary using \`Throwable.addSuppressed()\`. Neither exception is lost. You can
-also use \`addSuppressed\` manually when implementing your own resource management
-without try-with-resources.`,
+    public static void main(String[] args) {
+        // Test 1: all valid
+        try {
+            int[] nums = parseInts("1,2,3");
+            StringBuilder sb = new StringBuilder("Parsed:");
+            for (int n : nums) sb.append(" ").append(n);
+            System.out.println(sb);
+        } catch (InvalidTokenException e) {
+            System.out.println("Unexpected error: " + e.getMessage());
+        }
+
+        // Test 2: bad token at index 1
+        try {
+            parseInts("10,abc,30");
+            System.out.println("Should not reach here");
+        } catch (InvalidTokenException e) {
+            System.out.println("Bad token at index " + e.getIndex() + ": \\"" + e.getToken() + "\\"");
+        }
+    }
+}`,
+      explanation: `**Why a checked exception here?** \`InvalidTokenException\` extends \`Exception\` (not
+\`RuntimeException\`), so the compiler forces every caller of \`parseInts\` to either
+catch it or declare \`throws InvalidTokenException\`. This is the right choice: a bad
+token is an *environmental* condition (malformed input from outside the program), not
+a programming error — callers can meaningfully handle it.
+
+**Structured fields vs message parsing.** The exception stores \`token\` and \`index\` as
+typed fields with getters. A caller that wants to highlight the bad token in a UI or
+log a structured error can call \`e.getIndex()\` and \`e.getToken()\` directly — no string
+parsing required. This is the core design rule from the theory: **never force callers
+to parse your own error messages** to recover structured information.
+
+**Wrapping \`NumberFormatException\`.** \`Integer.parseInt\` throws an unchecked
+\`NumberFormatException\`. By catching it and rethrowing as \`InvalidTokenException\` the
+method translates a low-level library exception into a domain exception with richer
+context. The original \`NumberFormatException\` could be preserved as a cause
+(\`super(..., e)\`) — a production-quality version would do exactly that so the full
+chain appears in logs.
+
+**Fail-fast vs accumulate.** This exercise throws on the *first* bad token. Compare this
+to the CSV processor exercise (exercise 3) which accumulates all errors before reporting.
+Both are valid strategies — fail-fast is appropriate when partial results are not useful;
+accumulation is appropriate in batch contexts where you want a full error report.`,
     },
     {
       id: 'dual-resource-suppressed',

@@ -410,88 +410,121 @@ Compiling the \`Pattern\` once and reusing the \`Matcher\` is much cheaper than 
   ],
   exercises: [
     {
-      id: 'predict-interning',
-      title: 'Predict the output — String pool & interning',
+      id: 'first-non-repeating',
+      title: 'First non-repeating character',
       difficulty: 'warmup',
-      prompt: `Before running it, **predict the exact output of every labelled line** (A through H).
-Write a one-sentence reason for each prediction. Then run it and reconcile any surprises.
+      prompt: `Implement \`static char firstNonRepeating(String s)\` that returns the **first character
+that appears exactly once** in the string, scanning left-to-right.
 
-This is a classic screening puzzle: interviewers use \`==\` vs \`equals\` and constant
-folding to separate candidates who *think* they know strings from those who actually do.
+Return the **null character** \`'\\0'\` (sentinel) if no such character exists or if the
+input is \`null\` / empty.
 
-~~~java
-public class StringPool {
-    static final String CONSTANT = "hel" + "lo";   // compile-time constant
+Examples:
+~~~text
+"aabbcdd"   ->  'c'    (c appears once; a, b, d all repeat)
+"aabb"      ->  '\\0'   (every character repeats)
+"z"         ->  'z'    (single character — trivially unique)
+"swiss"     ->  'w'    (s appears 3 times, i once, w once — w comes first)
+""          ->  '\\0'
+~~~
+
+**Constraints:**
+- O(n) time — exactly **two** passes over the string: one to build a frequency count,
+  one to find the first character whose count is 1.
+- O(1) extra space — use an \`int[]\` array indexed by \`char\` value (ASCII fits in 128
+  entries; the array size is fixed regardless of input length).
+- Do **not** use \`HashMap\`, \`LinkedHashMap\`, or any collection class.
+- Do **not** call \`indexOf\` / \`lastIndexOf\` in a loop (that would be O(n²)).`,
+      starter: `public class FirstNonRepeating {
+
+    /**
+     * Returns the first character in s that appears exactly once,
+     * or '\\0' if none exists (or s is null/empty).
+     *
+     * Two-pass approach:
+     *   Pass 1 — build a frequency table (int[128], indexed by char value).
+     *   Pass 2 — scan s left-to-right and return the first char whose count == 1.
+     */
+    static char firstNonRepeating(String s) {
+        // TODO 1: handle null / empty input — return '\\0' immediately.
+
+        // TODO 2: allocate int[] freq = new int[128]; (covers all ASCII chars)
+
+        // TODO 3: pass 1 — iterate over s with s.charAt(i) and increment freq[c].
+
+        // TODO 4: pass 2 — iterate over s again; return s.charAt(i) when freq[c] == 1.
+
+        // TODO 5: no unique char found — return '\\0'.
+        return '\\0';
+    }
 
     public static void main(String[] args) {
-        String a = "hello";
-        String b = "hello";
-        String c = new String("hello");
-        String d = c.intern();
-
-        String part = "hel";
-        String e = part + "lo";         // runtime concatenation (part is a variable)
-        String f = "hel" + "lo";        // literal + literal
-
-        System.out.println(a == b);             // A
-        System.out.println(a == c);             // B
-        System.out.println(a == d);             // C
-        System.out.println(a == e);             // D
-        System.out.println(a == f);             // E
-        System.out.println(a == CONSTANT);      // F
-        System.out.println(a.equals(c));        // G
-        System.out.println(c.equals(e));        // H
+        System.out.println(firstNonRepeating("aabbcdd")); // c
+        System.out.println(firstNonRepeating("aabb"));    // (empty — null char)
+        System.out.println(firstNonRepeating("z"));       // z
+        System.out.println(firstNonRepeating("swiss"));   // w
+        System.out.println(firstNonRepeating(""));        // (empty — null char)
     }
-}
-~~~`,
-      starter: `// Write your prediction for each label as a comment, then run to verify.
-// A:
-// B:
-// C:
-// D:
-// E:
-// F:
-// G:
-// H:`,
+}`,
       hints: [
-        'A and B: string literals with the same character content both resolve to the same pool entry at class-load time.',
-        'C: new String("hello") explicitly bypasses the pool — a fresh heap object, different reference from the pool slot.',
-        'D: intern() returns the pooled entry, so d ends up pointing at the same slot as a.',
-        'E vs F: part + "lo" involves a variable — the compiler cannot fold it, so it builds a new String at runtime. "hel" + "lo" is two literals — the compiler folds it to a single "hello" literal that lands in the pool.',
-        'F and CONSTANT: CONSTANT is a static final field initialised with two string literals — that is a compile-time constant expression. The compiler folds it to "hello" and interns it.',
+        'Pass 1: \`for (int i = 0; i < s.length(); i++) { freq[s.charAt(i)]++; }\` — \`char\` widens to \`int\` automatically, giving you the ASCII index.',
+        'Pass 2: iterate s again in the same order and check \`freq[s.charAt(i)] == 1\`. The first character that satisfies this is your answer — return it immediately.',
+        'An \`int[128]\` is zero-initialised by default in Java, so you do not need to fill it. All entries start at 0 before pass 1.',
       ],
-      solution: `// A: true  — both literals "hello" resolve to the same pool entry
-// B: false — new String("hello") creates a fresh heap object outside the pool
-// C: true  — intern() returns the existing pooled "hello", same reference as a
-// D: false — part + "lo" is a runtime concatenation; produces a new String, not pooled
-// E: true  — "hel" + "lo" is a constant expression; compiler folds it to the pooled "hello"
-// F: true  — CONSTANT is a compile-time constant ("hel"+"lo"); equals the pooled literal
-// G: true  — equals() compares content, regardless of pool vs heap
-// H: true  — equals() compares content; both c and e have value "hello"`,
-      explanation: `**A** confirms that two string literals with the same content are the same object — the
-pool deduplicated them at class load time.
+      solution: `public class FirstNonRepeating {
 
-**B** is the classic trap: \`new String("hello")\` always allocates a new heap object even
-though the *argument* literal \`"hello"\` lives in the pool. The result is a different
-reference.
+    static char firstNonRepeating(String s) {
+        if (s == null || s.isEmpty()) return '\\0';
 
-**C** shows \`intern()\`: it looks up the pool and returns the canonical pooled reference,
-so \`d == a\` is \`true\` after the intern.
+        // O(1) space: fixed-size array covers the full ASCII range.
+        // Java zero-initialises int[] by default — no Arrays.fill needed.
+        int[] freq = new int[128];
 
-**D** vs **E** is the compile-time constant folding rule. \`part\` is a variable (not
-\`final\`), so \`part + "lo"\` cannot be resolved at compile time — the JVM executes it at
-runtime and allocates a new \`String\`. \`"hel" + "lo"\` is two literals; the compiler folds
-the expression to the constant \`"hello"\` and interns it in the pool.
+        // Pass 1: count occurrences of every character.
+        for (int i = 0; i < s.length(); i++) {
+            freq[s.charAt(i)]++;
+        }
 
-**F** extends that rule: \`static final String CONSTANT = "hel" + "lo"\` is a
-compile-time constant field initialiser. The compiler resolves it to \`"hello"\` and puts
-it in the constant pool of the \`.class\` file — effectively the same pool entry as the
-literal \`"hello"\`.
+        // Pass 2: find the leftmost character whose count is exactly 1.
+        for (int i = 0; i < s.length(); i++) {
+            if (freq[s.charAt(i)] == 1) return s.charAt(i);
+        }
 
-**G and H** remind you that \`equals\` compares *character content* and always works
-correctly, regardless of whether strings are pooled or heap-allocated. This is why the
-golden rule is: **always use \`equals\` for string comparison in production code**. The
-\`==\` behaviour is an implementation detail you must understand but should never rely on.`,
+        return '\\0'; // sentinel: no unique character found
+    }
+
+    public static void main(String[] args) {
+        System.out.println(firstNonRepeating("aabbcdd")); // c
+        System.out.println(firstNonRepeating("aabb"));    // (null char \\0)
+        System.out.println(firstNonRepeating("z"));       // z
+        System.out.println(firstNonRepeating("swiss"));   // w
+        System.out.println(firstNonRepeating(""));        // (null char \\0)
+    }
+}`,
+      explanation: `**Why two passes instead of one.** A single pass cannot determine whether a character
+is unique until the *entire* string has been scanned — the first \`'a'\` might look unique
+until a second \`'a'\` appears later. Two passes let you separate "count everything" from
+"find the answer", keeping the logic simple and the complexity O(n).
+
+**Why \`int[128]\` and not \`HashMap\`.** The ASCII character set has exactly 128 code
+points (0–127). An \`int[128]\` is allocated once, zero-initialised by the JVM, and indexed
+in O(1) with no hashing, boxing, or bucket collisions. Its size is constant regardless of
+input length, so the space complexity is O(1). A \`HashMap<Character, Integer>\` would also
+work but incurs autoboxing of each \`char\` to \`Character\`, hash computation, and potential
+rehashing — all avoidable overhead here.
+
+**The \`char\`-as-index trick.** Java \`char\` is an unsigned 16-bit integer. In the
+expression \`freq[s.charAt(i)]++\`, the compiler silently widens the \`char\` to \`int\`,
+giving you the ASCII code point as the array index. For the letter \`'a'\` that is 97, for
+\`'z'\` it is 122 — all safely within \`[0, 127]\`.
+
+**Sentinel return value.** Returning \`'\\0'\` (the null character, code point 0) instead of
+\`-1\` or throwing an exception keeps the return type as \`char\`. Callers can check
+\`result != '\\0'\` before using the result. This is a common idiom for \`char\`-returning
+methods when a "not found" state is needed without changing the signature.
+
+**Complexity.** Pass 1: O(n). Pass 2: O(n) worst case (no unique char). Total: O(2n) =
+O(n). Space: O(128) = O(1).`,
     },
     {
       id: 'longest-unique-substring',

@@ -354,89 +354,185 @@ the dispatch explicit and the compiler enforces completeness.`,
   ],
   exercises: [
     {
-      id: 'field-hiding-predict',
-      title: 'Predict the output — field hiding vs method overriding',
+      id: 'polymorphic-shape-area',
+      title: 'Polymorphic shape hierarchy — dynamic dispatch in action',
       difficulty: 'warmup',
-      prompt: `**Before running this, predict the exact output of every labelled line.**
-Write your prediction as a comment, then run and reconcile any surprise.
+      prompt: `Build a small shape hierarchy that demonstrates **dynamic dispatch**: a caller
+works entirely through the \`Shape\` base-type reference, yet the correct area formula
+runs for each concrete subtype at runtime.
 
-~~~java
-public class Predict {
+**Requirements:**
 
-    static class Vehicle {
-        String type = "Vehicle";
-        String kind() { return "Vehicle"; }
+1. An \`abstract\` class \`Shape\` with:
+   - \`public abstract double area()\`
+   - A concrete \`public String describe()\` that returns
+     \`"<ClassName> with area <value formatted to 2 dp>"\`
+     — implemented *once* in \`Shape\` using \`getClass().getSimpleName()\` and \`area()\`.
+
+2. \`Circle extends Shape\` — constructor takes \`double radius\`.
+   \`area()\` returns \`Math.PI * radius * radius\`.
+
+3. \`Rectangle extends Shape\` — constructor takes \`double width, double height\`.
+   \`area()\` returns \`width * height\`.
+
+4. A **static** method in the same file:
+   \`public static double totalArea(Shape[] shapes)\`
+   that iterates the array and sums \`shape.area()\` for every element.
+
+5. A \`main\` that:
+   - Creates a \`Shape[]\` containing a \`Circle(5)\`, a \`Rectangle(4, 6)\`, and a \`Circle(3)\`.
+   - Prints \`shape.describe()\` for each element through the base-type reference.
+   - Prints the total area formatted to 2 decimal places.
+
+**Expected output (approximately):**
+
+~~~text
+Circle with area 78.54
+Rectangle with area 24.00
+Circle with area 28.27
+Total area: 130.81
+~~~
+
+The point: \`describe()\` and \`totalArea\` are written once against \`Shape\`; the JVM
+dispatches to the right \`area()\` override at runtime. You never write an \`instanceof\`
+check or a cast.`,
+      starter: `public class ShapeHierarchy {
+
+    abstract static class Shape {
+        public abstract double area();
+
+        // TODO: implement describe() here once, using getClass().getSimpleName()
+        // and area() — do NOT override this in the subclasses.
+        public String describe() {
+            return "";
+        }
     }
 
-    static class Car extends Vehicle {
-        String type = "Car";          // shadows, does NOT override
+    static class Circle extends Shape {
+        private final double radius;
+        Circle(double radius) { this.radius = radius; }
+
         @Override
-        String kind() { return "Car"; }
+        public double area() {
+            // TODO
+            return 0;
+        }
     }
 
-    static class ElectricCar extends Car {
-        String type = "ElectricCar";
+    static class Rectangle extends Shape {
+        private final double width;
+        private final double height;
+        Rectangle(double width, double height) {
+            this.width  = width;
+            this.height = height;
+        }
+
         @Override
-        String kind() { return "ElectricCar"; }
+        public double area() {
+            // TODO
+            return 0;
+        }
+    }
+
+    // TODO: static totalArea method that sums area() for every Shape in the array
+    public static double totalArea(Shape[] shapes) {
+        return 0;
     }
 
     public static void main(String[] args) {
-        Vehicle v = new Car();
-        System.out.println(v.type);      // A
-        System.out.println(v.kind());    // B
+        Shape[] shapes = {
+            new Circle(5),
+            new Rectangle(4, 6),
+            new Circle(3),
+        };
 
-        Car c = new ElectricCar();
-        System.out.println(c.type);      // C
-        System.out.println(c.kind());    // D
-
-        Vehicle v2 = new ElectricCar();
-        System.out.println(v2.type);     // E
-        System.out.println(v2.kind());   // F
-
-        Vehicle v3 = new Car();
-        Car c2 = (Car) v3;
-        System.out.println(c2.type);     // G
+        for (Shape s : shapes) {
+            System.out.println(s.describe());
+        }
+        System.out.printf("Total area: %.2f%n", totalArea(shapes));
     }
-}
-~~~
-
-For each line, give: (1) the predicted value, (2) one sentence explaining the rule
-that determines it.`,
-      starter: `// Predict each labelled line BEFORE running.
-// A:
-// B:
-// C:
-// D:
-// E:
-// F:
-// G:`,
+}`,
       hints: [
-        'Fields are resolved by the DECLARED (compile-time) type of the reference. Methods are resolved by the RUNTIME type of the object.',
-        'After the downcast on the last line, the declared type of c2 is Car — so c2.type gives the Car field.',
-        'ElectricCar overrides kind() all the way down the chain. No matter how the reference is typed, kind() always returns the most-derived override.',
+        `In \`describe()\`, call \`this.area()\` — because \`area()\` is abstract and overridden, dynamic dispatch ensures the correct subclass formula runs even though the method is defined in \`Shape\`. Use \`String.format("%.2f", area())\` for the formatted value.`,
+        `\`getClass().getSimpleName()\` called on a \`Circle\` instance returns the string \`"Circle"\` at runtime — no hardcoding or casting needed.`,
+        `In \`totalArea\`, a plain enhanced for-loop with a running \`double sum\` accumulator is all you need. Each \`shape.area()\` call dispatches polymorphically.`,
       ],
-      solution: `// A: "Vehicle"   — v is declared as Vehicle; field lookup uses declared type
-// B: "Car"        — kind() is virtual; runtime object is Car, so Car.kind() runs
-// C: "Car"        — c is declared as Car; field lookup uses declared type, giving Car.type
-// D: "ElectricCar"— kind() dispatches to runtime type ElectricCar
-// E: "Vehicle"    — v2 is declared as Vehicle; field lookup uses declared type
-// F: "ElectricCar"— kind() dispatches to runtime type ElectricCar
-// G: "Car"        — after downcast, declared type is Car; Car.type is "Car"`,
-      explanation: `This is the **field hiding vs method overriding asymmetry** in concentrated form.
+      solution: `public class ShapeHierarchy {
 
-**Methods** use the JVM's virtual method table. Every call is resolved at runtime
-to the most-derived override regardless of the reference's compile-time type.
-That is dynamic dispatch.
+    abstract static class Shape {
+        public abstract double area();
 
-**Fields** have no equivalent mechanism. The compiler resolves a field access at
-compile time based solely on the declared type of the reference. When a subclass
-declares a field with the same name, it creates a *new*, independent field.
-The parent's field still exists on the object — you just can't reach it through
-a child-typed reference without an explicit cast.
+        public String describe() {
+            return String.format("%s with area %.2f",
+                getClass().getSimpleName(), area());
+        }
+    }
 
-Lines A/C/E/G all show the declared-type rule for fields; B/D/F show runtime
-dispatch for methods. If A and B surprised you, this pattern is the thing to
-internalise before any Java systems interview.`,
+    static class Circle extends Shape {
+        private final double radius;
+        Circle(double radius) { this.radius = radius; }
+
+        @Override
+        public double area() { return Math.PI * radius * radius; }
+    }
+
+    static class Rectangle extends Shape {
+        private final double width;
+        private final double height;
+        Rectangle(double width, double height) {
+            this.width  = width;
+            this.height = height;
+        }
+
+        @Override
+        public double area() { return width * height; }
+    }
+
+    public static double totalArea(Shape[] shapes) {
+        double sum = 0;
+        for (Shape s : shapes) {
+            sum += s.area();
+        }
+        return sum;
+    }
+
+    public static void main(String[] args) {
+        Shape[] shapes = {
+            new Circle(5),
+            new Rectangle(4, 6),
+            new Circle(3),
+        };
+
+        for (Shape s : shapes) {
+            System.out.println(s.describe());
+        }
+        System.out.printf("Total area: %.2f%n", totalArea(shapes));
+        // Circle with area 78.54
+        // Rectangle with area 24.00
+        // Circle with area 28.27
+        // Total area: 130.81
+    }
+}`,
+      explanation: `**Dynamic dispatch in \`describe()\`.** The method is defined once on \`Shape\`
+and calls \`this.area()\`. At runtime, \`this\` is a \`Circle\` or a \`Rectangle\`, so
+the JVM's virtual method table routes \`area()\` to whichever override matches the
+**runtime type** — not the declared type \`Shape\`. This is the fundamental mechanism
+behind polymorphism: write the algorithm once against the abstraction; let the JVM
+wire in the right implementation.
+
+**\`getClass().getSimpleName()\`** returns the concrete class name (\`"Circle"\`,
+\`"Rectangle"\`) at runtime without any \`instanceof\` chain or cast. The name is
+correct even if you later add a \`Triangle\` subclass — \`describe()\` needs no change.
+
+**\`totalArea\` is the canonical polymorphic aggregation.** The method knows nothing
+about circles or rectangles. Each call \`s.area()\` dispatches to the right formula.
+Adding a new subtype requires zero changes to \`totalArea\` — this is the **Open/Closed
+Principle** (open for extension, closed for modification) in its simplest form.
+
+**Why \`abstract\` matters here.** Marking \`area()\` \`abstract\` forces every subclass
+to provide a formula; the compiler rejects any concrete subclass that forgets to
+override it. Without \`abstract\`, you could silently inherit a default that returns
+\`0\` and never notice during compile — only at runtime when your totals are wrong.`,
     },
     {
       id: 'constructor-overridable',

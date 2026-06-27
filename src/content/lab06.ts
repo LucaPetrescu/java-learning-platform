@@ -323,132 +323,115 @@ Key-value pairs?
   ],
   exercises: [
     {
-      id: 'spot-the-bug',
-      title: 'Spot the bug: mutable key & iteration hazard',
+      id: 'group-by-first-letter',
+      title: 'Group words by first letter',
       difficulty: 'warmup',
-      prompt: `The two classes below each contain a **silent correctness bug** related to
-\`HashMap\` internals or iteration.
-
-**Class A** — the lookup always returns \`null\` even though the key was inserted.
-**Class B** — depending on JVM timing, it either silently skips elements or
-throws \`ConcurrentModificationException\`.
+      prompt: `Implement the static method below that groups a list of words by their **lowercase
+first letter**, preserving the original input order within each group.
 
 ~~~java
-// ---- Class A ----
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
-
-class Point {
-    int x, y;
-    Point(int x, int y) { this.x = x; this.y = y; }
-
-    @Override
-    public boolean equals(Object o) {
-        if (!(o instanceof Point p)) return false;
-        return x == p.x && y == p.y;
-    }
-    // no hashCode override
-}
-
-public class ClassA {
-    public static void main(String[] args) {
-        Map<Point, String> map = new HashMap<>();
-        Point p = new Point(1, 2);
-        map.put(p, "origin");
-        System.out.println(map.get(new Point(1, 2)));  // expects "origin", prints null
-    }
-}
-
-// ---- Class B ----
-import java.util.ArrayList;
-import java.util.List;
-
-public class ClassB {
-    public static void main(String[] args) {
-        List<String> words = new ArrayList<>(
-            List.of("alpha", "beta", "gamma", "beta", "delta"));
-        for (String w : words) {
-            if (w.equals("beta")) words.remove(w);
-        }
-        System.out.println(words);
-    }
-}
+static Map<Character, List<String>> groupByFirstLetter(List<String> words)
 ~~~
 
-**Tasks:**
-1. For each class, describe the bug in one or two sentences. Name the **root cause**
-   (not just the symptom).
-2. Show the corrected version of each class (minimal fix only — do not rewrite
-   unrelated code).`,
-      starter: `// Write your analysis as comments, then show the fix.
+**Examples:**
 
-// Class A — root cause:
-// Class A — fix:
+~~~text
+Input:  ["banana", "apple", "avocado", "cherry", "blueberry", "apricot"]
+Output: {b=[banana, blueberry], a=[apple, avocado, apricot], c=[cherry]}
 
-// Class B — root cause:
-// Class B — fix:`,
-      hints: [
-        'Class A: the HashMap contract requires that equal objects have equal hashCodes. Object\'s default hashCode is identity-based, so two distinct Point instances with the same coordinates hash to different buckets.',
-        'Class B: ArrayList\'s iterator snapshots modCount on creation and checks it on each next(). Calling list.remove() increments modCount, causing the next check to throw — or, in the one-element-remaining edge case, the iterator terminates early without throwing.',
-        'Class B fix: use removeIf("beta"::equals) or an explicit Iterator with it.remove().',
-      ],
-      solution: `// ---- Class A root cause ----
-// Point overrides equals but NOT hashCode. The JVM's default hashCode is
-// identity-based (address-derived), so two Point objects with the same (x,y)
-// land in different HashMap buckets. get(new Point(1,2)) looks in the wrong
-// bucket and returns null.
+Input:  ["Zoo", "zebra", "ant", "Ape"]
+Output: {z=[Zoo, zebra], a=[ant, Ape]}   // first letter lowercased as the key
+~~~
 
-// ---- Class A fix ----
-class Point {
-    int x, y;
-    Point(int x, int y) { this.x = x; this.y = y; }
-
-    @Override
-    public boolean equals(Object o) {
-        if (!(o instanceof Point p)) return false;
-        return x == p.x && y == p.y;
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(x, y);   // equal Points now hash identically
-    }
-}
-
-// ---- Class B root cause ----
-// The for-each loop uses ArrayList's fail-fast iterator. Calling words.remove(w)
-// increments the list's modCount. On the next call to iterator.next() the iterator
-// detects the discrepancy and throws ConcurrentModificationException — or silently
-// skips the element immediately after the removed one (the index shifts under the iterator).
-
-// ---- Class B fix ----
-import java.util.ArrayList;
+**Requirements:**
+1. The key is the **lowercase** first character of the word (\`Character.toLowerCase(word.charAt(0))\`).
+2. Use \`Map.computeIfAbsent\` to initialise missing lists — no \`containsKey\` or \`getOrDefault\` check.
+3. Return a \`HashMap\` (iteration order of keys does not matter; list order within each key must match input order).
+4. You may assume the input list is non-null and every word has at least one character.`,
+      starter: `import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
-public class ClassB {
+public class GroupByFirstLetter {
+
+    static Map<Character, List<String>> groupByFirstLetter(List<String> words) {
+        Map<Character, List<String>> result = new HashMap<>();
+
+        for (String word : words) {
+            // TODO: derive the lowercase first-letter key
+            // TODO: use computeIfAbsent to get-or-create the list, then add the word
+        }
+
+        return result;
+    }
+
     public static void main(String[] args) {
-        List<String> words = new ArrayList<>(
-            List.of("alpha", "beta", "gamma", "beta", "delta"));
+        System.out.println(groupByFirstLetter(
+            List.of("banana", "apple", "avocado", "cherry", "blueberry", "apricot")));
+        // e.g. {a=[apple, avocado, apricot], b=[banana, blueberry], c=[cherry]}
 
-        words.removeIf("beta"::equals);   // safe: removeIf uses its own internal loop
-
-        System.out.println(words);  // [alpha, gamma, delta]
+        System.out.println(groupByFirstLetter(
+            List.of("Zoo", "zebra", "ant", "Ape")));
+        // {z=[Zoo, zebra], a=[ant, Ape]}
     }
 }`,
-      explanation: `**Class A** illustrates the most common HashMap bug in interviews. The Java
-specification for \`Object\` requires: *"if \`a.equals(b)\` then \`a.hashCode() == b.hashCode()\`".*
-When you override \`equals\` without \`hashCode\`, this contract breaks. The HashMap picks a
-bucket using the hash, so two logically equal keys with different hashes land in different
-buckets and \`get\` always misses. The fix — \`Objects.hash(x, y)\` — combines the fields
-using the same algorithm, ensuring equal points get the same hash.
+      hints: [
+        'Key derivation: \`char key = Character.toLowerCase(word.charAt(0));\` — \`charAt(0)\` gives the first character, \`toLowerCase\` normalises case.',
+        '\`computeIfAbsent\` signature: \`result.computeIfAbsent(key, k -> new ArrayList<>())\`. It returns the existing list if the key is already present, or inserts a new empty \`ArrayList\` and returns it if not. Chain \`.add(word)\` directly on the returned list.',
+        'The full loop body is just two lines: compute the key, then \`result.computeIfAbsent(key, k -> new ArrayList<>()).add(word);\`. No \`if\`/\`else\` needed.',
+      ],
+      solution: `import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
-**Class B** exposes the fail-fast iterator mechanism. \`ArrayList\` (and most JCF
-collections) track structural changes via a \`modCount\` counter. The enhanced for-each
-creates an iterator that snapshots \`modCount\`; every call to \`iterator.next()\` compares
-the snapshot to the live value. A direct \`list.remove\` modifies \`modCount\`, causing
-the next \`next()\` call to throw. \`removeIf\` is the clean fix because it performs the
-iteration internally and never exposes the cursor to the outside.`,
+public class GroupByFirstLetter {
+
+    static Map<Character, List<String>> groupByFirstLetter(List<String> words) {
+        Map<Character, List<String>> result = new HashMap<>();
+
+        for (String word : words) {
+            char key = Character.toLowerCase(word.charAt(0));
+            result.computeIfAbsent(key, k -> new ArrayList<>()).add(word);
+        }
+
+        return result;
+    }
+
+    public static void main(String[] args) {
+        System.out.println(groupByFirstLetter(
+            List.of("banana", "apple", "avocado", "cherry", "blueberry", "apricot")));
+        // {a=[apple, avocado, apricot], b=[banana, blueberry], c=[cherry]}
+
+        System.out.println(groupByFirstLetter(
+            List.of("Zoo", "zebra", "ant", "Ape")));
+        // {z=[Zoo, zebra], a=[ant, Ape]}
+    }
+}`,
+      explanation: `**\`computeIfAbsent\`** is the idiomatic way to build a \`Map<K, List<V>>\` (a
+"multimap"). Its contract is:
+
+> If the key is absent, call the mapping function, store the result, and return it.
+> If the key is present, return the existing value without calling the function.
+
+This collapses the classic three-liner pattern —
+
+~~~java
+if (!map.containsKey(key)) map.put(key, new ArrayList<>());
+map.get(key).add(value);
+~~~
+
+— into a single expression: \`map.computeIfAbsent(key, k -> new ArrayList<>()).add(value)\`.
+
+**Why not \`getOrDefault\`?** \`getOrDefault\` returns the default but does **not** insert it
+into the map, so you would still need a separate \`put\`. \`computeIfAbsent\` inserts atomically.
+
+**Insertion order within each list** is preserved automatically because we iterate the
+input in order and always \`add\` to the tail of the \`ArrayList\`.
+
+**Key normalisation** (\`Character.toLowerCase\`) ensures \`'Z'\` and \`'z'\` map to the same
+bucket. Without it, "Zoo" and "zebra" would land under different keys.`,
     },
     {
       id: 'lru-cache',

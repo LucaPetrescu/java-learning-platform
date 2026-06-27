@@ -405,174 +405,182 @@ or write instance fields, it must call abstract methods to do so — which is ex
   exercises: [
     {
       id: 'diamond-default-conflict',
-      title: 'Predict & resolve the default-method diamond',
+      title: 'Write and resolve a default-method conflict',
       difficulty: 'warmup',
-      prompt: `Below is a complete program with **four deliberate issues** related to default methods and
-access modifiers. **Predict what happens at each marked line** (compile error, runtime exception,
-or unexpected output), then fix all four issues so the program compiles and produces the output
-shown.
+      prompt: `Your task is to **write** two interfaces that both declare a \`default\` method with the
+same signature, then write a class that implements both and **resolves the conflict** by
+combining the two default implementations.
+
+**Step 1 — declare the interfaces.**
+
+Create two interfaces, \`Logger\` and \`Auditor\`, each with a \`default\` method:
 
 ~~~java
-// ---- snippet to analyse ----
-interface Greeter {
-    default String greet(String name) {
-        return "Hello, " + name;
-    }
-}
+String tag();
+~~~
 
-interface Farewell {
-    default String greet(String name) {   // (A) same signature as Greeter.greet
-        return "Goodbye, " + name;
-    }
-}
+- \`Logger.tag()\` returns \`"[LOG]"\`
+- \`Auditor.tag()\` returns \`"[AUDIT]"\`
 
-class Diplomat implements Greeter, Farewell {
-    // (B) no override provided
-}
+Each interface also has one abstract method:
 
-class Spy extends Diplomat {
-    // (C) calls the interface default directly
-    public String greet(String name) {
-        return Greeter.super.greet(name);
-    }
-}
+- \`Logger\`: \`void log(String message)\`
+- \`Auditor\`: \`void record(String event)\`
 
-class AccessTest {
+**Step 2 — implement both in \`EventService\`.**
+
+\`EventService\` implements both \`Logger\` and \`Auditor\`. It must:
+
+1. Override \`tag()\` and return the **combination** of both interface defaults, separated by
+   a space: \`Logger.super.tag() + " " + Auditor.super.tag()\`
+2. Implement \`log(String message)\` to print: \`tag() + " LOG: " + message\`
+3. Implement \`record(String event)\` to print: \`tag() + " AUDIT: " + event\`
+
+**Step 3 — drive it from \`TagDemo.main\`.**
+
+~~~java
+class TagDemo {
     public static void main(String[] args) {
-        Diplomat d = new Diplomat();
-        System.out.println(d.greet("World"));   // (D) what happens here?
+        EventService svc = new EventService();
+        svc.log("User signed in");
+        svc.record("GDPR consent updated");
 
-        Spy s = new Spy();
-        System.out.println(s.greet("Bond"));    // (E)
-
-        Greeter g = new Spy();
-        System.out.println(g.greet("M"));       // (F)
+        // Upcast to Logger — tag() still dispatches to EventService.tag()
+        Logger l = svc;
+        System.out.println(l.tag());
     }
 }
 ~~~
 
-Expected output **after your fix**:
+Expected output:
 
 ~~~text
-Hi, World
-Hello, Bond
-Hello, M
+[LOG] [AUDIT] LOG: User signed in
+[LOG] [AUDIT] AUDIT: GDPR consent updated
+[LOG] [AUDIT]
 ~~~
 
 Requirements:
-- \`Diplomat.greet\` must produce \`"Hi, " + name\` (override the conflict in Diplomat).
-- \`Spy.greet\` must delegate to \`Greeter.super.greet\` (keep that line).
-- The \`AccessTest.main\` must run without errors.`,
-      starter: `// Paste and fix the snippet. Your goal:
-// 1. Identify lines A-F: compile error? runtime error? unexpected output?
-// 2. Fix all issues so the expected output appears.
-// Write your analysis as comments before the fixed code.
+- \`EventService\` must NOT redeclare \`tag()\` body from scratch — it **must** delegate to
+  \`Logger.super.tag()\` and \`Auditor.super.tag()\` to compose the result.
+- The program must compile and produce exactly the output above.`,
+      starter: `// Step 1: declare Logger
+interface Logger {
+    // TODO: abstract method
+    // void log(String message);
 
-// A:
-// B:
-// C:
-// D:
-// E:
-// F:
+    // TODO: default tag() returning "[LOG]"
+}
 
-interface Greeter {
-    default String greet(String name) {
-        return "Hello, " + name;
+// Step 1: declare Auditor
+interface Auditor {
+    // TODO: abstract method
+    // void record(String event);
+
+    // TODO: default tag() returning "[AUDIT]"
+}
+
+// Step 2: implement both interfaces
+class EventService implements Logger, Auditor {
+
+    @Override
+    public String tag() {
+        // TODO: return Logger.super.tag() + " " + Auditor.super.tag()
+        return "";
+    }
+
+    @Override
+    public void log(String message) {
+        // TODO: print tag() + " LOG: " + message
+    }
+
+    @Override
+    public void record(String event) {
+        // TODO: print tag() + " AUDIT: " + event
     }
 }
 
-interface Farewell {
-    default String greet(String name) {
-        return "Goodbye, " + name;
-    }
-}
-
-class Diplomat implements Greeter, Farewell {
-    // TODO: add required override
-}
-
-class Spy extends Diplomat {
-    public String greet(String name) {
-        return Greeter.super.greet(name);
-    }
-}
-
-class AccessTest {
+// Step 3: drive it
+class TagDemo {
     public static void main(String[] args) {
-        Diplomat d = new Diplomat();
-        System.out.println(d.greet("World"));
+        EventService svc = new EventService();
+        svc.log("User signed in");
+        svc.record("GDPR consent updated");
 
-        Spy s = new Spy();
-        System.out.println(s.greet("Bond"));
-
-        Greeter g = new Spy();
-        System.out.println(g.greet("M"));
+        Logger l = svc;
+        System.out.println(l.tag());
     }
 }`,
       hints: [
-        'A/B are the same problem: Diplomat implements both interfaces and inherits two conflicting default greet() bodies. The compiler requires Diplomat to override greet() — it cannot choose for you.',
-        'C is legal on its own, but Spy extends Diplomat, not a class that directly implements Greeter. Greeter.super.greet() is still valid because Spy\'s supertype chain includes Greeter through Diplomat.',
-        'D is a compile error (not runtime) because of B — fix B first and D resolves itself. E and F are fine once B is fixed; they call Spy.greet() through different reference types, but dispatch is always at runtime.',
+        'A class that implements two interfaces with the same \`default\` method signature **must** override that method — the compiler will reject the class otherwise. The override is your explicit resolution point.',
+        'Inside the overriding class, \`Logger.super.tag()\` calls \`Logger\`\'s default implementation and \`Auditor.super.tag()\` calls \`Auditor\`\'s. This syntax is only valid inside the class that directly lists both interfaces in its \`implements\` clause.',
+        'The upcast \`Logger l = svc\` does not change which \`tag()\` runs — Java dispatches on the **runtime type** (\`EventService\`), not the reference type (\`Logger\`). So \`l.tag()\` still returns \`"[LOG] [AUDIT]"\`.',
       ],
-      solution: `// Analysis:
-// A: Farewell.greet has the same signature as Greeter.greet — conflict source.
-// B: COMPILE ERROR — Diplomat inherits two conflicting defaults and provides no override.
-// C: Legal — Spy can call Greeter.super.greet() because Greeter is in its supertype chain.
-// D: COMPILE ERROR (blocked by B) — once B is fixed, this calls Diplomat.greet("World").
-// E: prints "Hello, Bond" — Spy.greet delegates to Greeter.super.greet.
-// F: prints "Hello, M"   — runtime dispatch to Spy.greet regardless of reference type.
+      solution: `interface Logger {
+    void log(String message);
 
-interface Greeter {
-    default String greet(String name) {
-        return "Hello, " + name;
+    default String tag() {
+        return "[LOG]";
     }
 }
 
-interface Farewell {
-    default String greet(String name) {
-        return "Goodbye, " + name;
+interface Auditor {
+    void record(String event);
+
+    default String tag() {
+        return "[AUDIT]";
     }
 }
 
-class Diplomat implements Greeter, Farewell {
+class EventService implements Logger, Auditor {
+
     @Override
-    public String greet(String name) {
-        return "Hi, " + name;   // resolves the conflict; Diplomat owns the method now
+    public String tag() {
+        // Explicitly delegates to each interface's default to compose the combined tag.
+        return Logger.super.tag() + " " + Auditor.super.tag();
     }
-}
 
-class Spy extends Diplomat {
     @Override
-    public String greet(String name) {
-        return Greeter.super.greet(name);
+    public void log(String message) {
+        System.out.println(tag() + " LOG: " + message);
+    }
+
+    @Override
+    public void record(String event) {
+        System.out.println(tag() + " AUDIT: " + event);
     }
 }
 
-class AccessTest {
+class TagDemo {
     public static void main(String[] args) {
-        Diplomat d = new Diplomat();
-        System.out.println(d.greet("World"));   // Hi, World
+        EventService svc = new EventService();
+        svc.log("User signed in");
+        svc.record("GDPR consent updated");
 
-        Spy s = new Spy();
-        System.out.println(s.greet("Bond"));    // Hello, Bond
-
-        Greeter g = new Spy();
-        System.out.println(g.greet("M"));       // Hello, M
+        Logger l = svc;
+        System.out.println(l.tag());
     }
 }`,
-      explanation: `The core lesson: **the compiler never picks between two conflicting \`default\` methods** —
-it always demands an explicit resolution. The fix in \`Diplomat\` unambiguously names the new
-behaviour for all \`Diplomat\` instances.
+      explanation: `**Why the override is mandatory.**
+When \`EventService\` declares \`implements Logger, Auditor\` and both interfaces supply a
+\`default String tag()\`, the compiler cannot pick one — it treats this as an ambiguity error.
+The class is required to provide its own \`tag()\` implementation. This is not optional: omitting
+the override is a compile-time error, regardless of whether the two defaults happen to produce
+the same value.
 
-\`InterfaceName.super.method()\` is the only syntax that reaches a specific interface's
-default. It is only callable from a class that is in the direct \`implements\` list (or its
-subtypes). \`Spy\` can use it because \`Greeter\` is in its transitive \`implements\` set via
-\`Diplomat\`.
+**\`InterfaceName.super.method()\` — the only way to reach a specific default.**
+Inside the overriding class you can call \`Logger.super.tag()\` to invoke \`Logger\`'s default
+and \`Auditor.super.tag()\` to invoke \`Auditor\`'s. This syntax is only available inside a
+class that directly names the interface in its \`implements\` list (or a subinterface that
+extends it). You cannot call it from outside the class.
 
-Lines E and F illustrate the golden rule of Java polymorphism: **dispatch is always on the
-actual runtime type**, never the reference type. \`Greeter g = new Spy()\` stores a \`Spy\`,
-so \`g.greet()\` calls \`Spy.greet()\` — the \`Greeter\` variable type is invisible to the JVM
-at the call site.`,
+**Runtime dispatch ignores the reference type.**
+\`Logger l = svc; l.tag()\` still calls \`EventService.tag()\` — not \`Logger\`'s default.
+The JVM resolves virtual calls at runtime against the actual object type (\`EventService\`),
+not the declared variable type (\`Logger\`). The interface variable is invisible to the
+dispatch mechanism. This is consistent with all Java polymorphism: the reference type
+determines what methods are *visible* at compile time; the object type determines which
+implementation *runs* at runtime.`,
     },
     {
       id: 'fsm-enum',

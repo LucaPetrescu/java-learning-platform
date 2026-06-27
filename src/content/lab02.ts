@@ -326,85 +326,214 @@ Practical checklist before putting a class in a collection:
   ],
   exercises: [
     {
-      id: 'predict-references',
-      title: 'Predict the output: references, == vs equals, aliasing',
+      id: 'money-value-type',
+      title: 'Money: an immutable value type with currency validation',
       difficulty: 'warmup',
-      prompt: `Before running it, **predict the exact output of every labelled line** and write
-a one-sentence reason for each. Then run it and reconcile surprises.
+      prompt: `Implement an immutable \`Money\` value type that represents a monetary amount
+in **minor units** (e.g. cents) together with a 3-letter ISO 4217 currency code.
 
-Every line is a classic object-model trap. Getting all of them right means your
-mental model of Java references and equality is solid.
+**Requirements:**
+- \`Money(long amountMinorUnits, String currencyCode)\` — stores amount in the smallest
+  currency unit (so £12.34 is stored as \`1234L\` with code \`"GBP"\`).
+  The constructor must throw \`IllegalArgumentException\` if \`currencyCode\` is not
+  exactly 3 uppercase ASCII letters (regex \`[A-Z]{3}\`). Null currency is also invalid.
+- \`Money plus(Money other)\` — returns a **new** \`Money\` with the sum.
+  Throws \`IllegalArgumentException\` if the currencies differ. Never mutates \`this\`.
+- \`long getAmountMinorUnits()\` and \`String getCurrencyCode()\` — plain accessors.
+- \`equals(Object)\` and \`hashCode()\` by both fields (value equality, not identity).
+- \`toString()\` — formats the amount with two decimal places followed by the code,
+  e.g. \`"12.34 USD"\` for \`Money(1234, "USD")\` and \`"-0.05 EUR"\` for \`Money(-5, "EUR")\`.
 
-~~~java
-import java.util.Objects;
+**All fields must be \`private final\`.** No setters. The class must be declared \`final\`.
 
-public class Predict {
-    static int[] copy(int[] src) { return src; }   // intentionally wrong
+**In \`main\`, demonstrate:**
+1. Two \`Money\` objects with the same amount and currency are \`.equals\` and produce
+   the same \`hashCode\`.
+2. \`plus\` returns a new object with the correct sum; the originals are unchanged.
+3. Calling \`plus\` with a different currency throws \`IllegalArgumentException\`.
+4. An invalid currency code (e.g. \`"us"\`) throws \`IllegalArgumentException\` at construction.`,
+      starter: `import java.util.Objects;
+
+public final class Money {
+    private final long   amountMinorUnits;
+    private final String currencyCode;      // exactly 3 uppercase letters
+
+    public Money(long amountMinorUnits, String currencyCode) {
+        // TODO: validate currencyCode — null check first, then regex [A-Z]{3}
+        this.amountMinorUnits = amountMinorUnits;
+        this.currencyCode     = currencyCode;
+    }
+
+    public long getAmountMinorUnits() { return amountMinorUnits; }
+    public String getCurrencyCode()   { return currencyCode; }
+
+    public Money plus(Money other) {
+        // TODO: throw if currencies differ, else return new Money with summed amounts
+        return null;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        // TODO: standard equals pattern — check identity, instanceof, then fields
+        return false;
+    }
+
+    @Override
+    public int hashCode() {
+        // TODO: Objects.hash(amountMinorUnits, currencyCode)
+        return 0;
+    }
+
+    @Override
+    public String toString() {
+        // TODO: format amountMinorUnits as decimal with 2 decimal places + " " + currencyCode
+        // Hint: amountMinorUnits 1234 with code "USD" => "12.34 USD"
+        //       amountMinorUnits  -5  with code "EUR" => "-0.05 EUR"
+        return "";
+    }
 
     public static void main(String[] args) {
-        // --- A: aliasing ---
-        int[] a = {10, 20, 30};
-        int[] b = copy(a);
-        b[0] = 99;
-        System.out.println(a[0]);                          // A
+        Money a = new Money(1234, "USD");
+        Money b = new Money(1234, "USD");
+        Money c = new Money(567,  "USD");
 
-        // --- B/C: String identity vs equality ---
-        String s1 = new String("hello");
-        String s2 = new String("hello");
-        System.out.println(s1 == s2);                      // B
-        System.out.println(s1.equals(s2));                 // C
+        // 1. Value equality
+        System.out.println("a.equals(b): " + a.equals(b));               // true
+        System.out.println("same hashCode: " + (a.hashCode() == b.hashCode())); // true
 
-        // --- D/E: Integer cache boundary ---
-        Integer x = 127, y = 127;
-        System.out.println(x == y);                        // D
-        Integer p = 128, q = 128;
-        System.out.println(p == q);                        // E
+        // 2. plus
+        Money sum = a.plus(c);
+        System.out.println("a.plus(c): " + sum);     // 18.01 USD
+        System.out.println("a unchanged: " + a);      // 12.34 USD
 
-        // --- F: null-safe equals via Objects.equals ---
-        String n = null;
-        System.out.println(Objects.equals(n, "hello"));   // F
-        // System.out.println(n.equals("hello"));          // would throw NPE
+        // 3. Currency mismatch
+        Money eur = new Money(100, "EUR");
+        try {
+            a.plus(eur);
+            System.out.println("ERROR: should have thrown");
+        } catch (IllegalArgumentException e) {
+            System.out.println("Caught expected: " + e.getMessage());
+        }
 
-        // --- G: reassigning a reference parameter ---
-        int[] arr = {1, 2, 3};
-        zap(arr);
-        System.out.println(arr[0]);                        // G
+        // 4. Invalid code
+        try {
+            new Money(100, "us");
+            System.out.println("ERROR: should have thrown");
+        } catch (IllegalArgumentException e) {
+            System.out.println("Caught expected: " + e.getMessage());
+        }
     }
-
-    static void zap(int[] a) {
-        a = new int[]{99, 99, 99};   // reassigns local copy only
-    }
-}
-~~~`,
-      starter: `// Write your prediction for A–G as comments, then run to check.
-// A:
-// B:
-// C:
-// D:
-// E:
-// F:
-// G:`,
+}`,
       hints: [
-        'A: the \`copy\` method returns the same reference, not a new array. Mutating \`b[0]\` mutates \`a[0]\`.',
-        'D vs E: the JVM caches Integer objects for values -128 to 127, so \`==\` is accidentally true there. Outside the range, two distinct heap objects are created.',
-        'G: \`zap\` reassigns the local parameter \`a\` to point at a new array. The caller\'s \`arr\` variable is unaffected — Java is pass-by-value, and the value is the reference.',
+        'Validate \`currencyCode\` in two steps: \`Objects.requireNonNull(currencyCode, "currencyCode must not be null")\` first, then \`if (!currencyCode.matches("[A-Z]{3}")) throw new IllegalArgumentException("invalid currency: " + currencyCode);\`',
+        'For \`toString\`, work entirely in \`long\` arithmetic — no \`double\`. Separate the amount into whole units and remainder with \`Math.abs\`: \`long whole = Math.abs(amountMinorUnits) / 100; long frac = Math.abs(amountMinorUnits) % 100;\`. Prefix a \`"-"\` when \`amountMinorUnits < 0\`, then use \`String.format("%d.%02d %s", whole, frac, currencyCode)\` on the unsigned parts.',
+        'The \`equals\` canonical pattern: \`if (o == this) return true;\` then \`if (!(o instanceof Money)) return false;\` then cast and compare both \`amountMinorUnits\` and \`currencyCode\` (use \`Objects.equals\` for the \`String\` field).',
       ],
-      solution: `// A: 99       — copy() returns the same reference; b is an alias of a; b[0]=99 mutates a
-// B: false     — new String(...) explicitly allocates a new heap object; == tests identity
-// C: true      — equals() compares the char sequence, not the identity
-// D: true      — 127 is within the Integer cache range (-128..127); same cached object
-// E: false     — 128 is outside the cache; p and q are distinct boxed objects
-// F: false     — Objects.equals(null, "hello") returns false without NPE; first arg is null
-// G: 1         — zap() only reassigns its local parameter; arr in main still points to {1,2,3}`,
-      explanation: `**A** demonstrates why "copy by assignment" is a bug: the function hands back the same
-pointer. Every pass-by-reference pitfall in Java traces to this. **B/C** show the
-canonical \`==\` vs \`equals\` difference on \`String\` — never use \`==\` on object content.
-**D/E** show the Integer cache: the JVM interns boxed integers from -128 to 127 as a
-performance optimisation; \`==\` is accidentally true inside that range and false
-outside, which is why you must always use \`.equals()\` on boxed types. **F** shows
-\`Objects.equals\`, the null-safe wrapper you should reach for whenever either side could
-be null. **G** nails pass-by-value: the method gets a copy of the reference; pointing
-that copy at a new array has no effect on the caller's variable.`,
+      solution: `import java.util.Objects;
+
+public final class Money {
+    private final long   amountMinorUnits;
+    private final String currencyCode;
+
+    public Money(long amountMinorUnits, String currencyCode) {
+        Objects.requireNonNull(currencyCode, "currencyCode must not be null");
+        if (!currencyCode.matches("[A-Z]{3}")) {
+            throw new IllegalArgumentException("invalid currency code: " + currencyCode);
+        }
+        this.amountMinorUnits = amountMinorUnits;
+        this.currencyCode     = currencyCode;
+    }
+
+    public long getAmountMinorUnits() { return amountMinorUnits; }
+    public String getCurrencyCode()   { return currencyCode; }
+
+    public Money plus(Money other) {
+        if (!currencyCode.equals(other.currencyCode)) {
+            throw new IllegalArgumentException(
+                "currency mismatch: " + currencyCode + " vs " + other.currencyCode);
+        }
+        return new Money(amountMinorUnits + other.amountMinorUnits, currencyCode);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o == this) return true;
+        if (!(o instanceof Money)) return false;
+        Money m = (Money) o;
+        return amountMinorUnits == m.amountMinorUnits
+            && Objects.equals(currencyCode, m.currencyCode);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(amountMinorUnits, currencyCode);
+    }
+
+    @Override
+    public String toString() {
+        String sign  = amountMinorUnits < 0 ? "-" : "";
+        long whole   = Math.abs(amountMinorUnits) / 100;
+        long frac    = Math.abs(amountMinorUnits) % 100;
+        return sign + String.format("%d.%02d %s", whole, frac, currencyCode);
+    }
+
+    public static void main(String[] args) {
+        Money a = new Money(1234, "USD");
+        Money b = new Money(1234, "USD");
+        Money c = new Money(567,  "USD");
+
+        System.out.println("a.equals(b): " + a.equals(b));                      // true
+        System.out.println("same hashCode: " + (a.hashCode() == b.hashCode())); // true
+
+        Money sum = a.plus(c);
+        System.out.println("a.plus(c): " + sum);    // 18.01 USD
+        System.out.println("a unchanged: " + a);     // 12.34 USD
+
+        Money eur = new Money(100, "EUR");
+        try {
+            a.plus(eur);
+        } catch (IllegalArgumentException e) {
+            System.out.println("Caught expected: " + e.getMessage());
+        }
+
+        try {
+            new Money(100, "us");
+        } catch (IllegalArgumentException e) {
+            System.out.println("Caught expected: " + e.getMessage());
+        }
+
+        // Negative amount
+        System.out.println(new Money(-5, "EUR"));   // -0.05 EUR
+    }
+}`,
+      explanation: `**Immutability by design.** All three fields (\`amountMinorUnits\`, \`currencyCode\`) are
+\`private final\` and both are already immutable types (\`long\` is a primitive; \`String\`
+is immutable in Java). The class is declared \`final\` so no subclass can add mutable
+state or weaken the invariants. There is nothing to defensively copy here — the hard
+part of immutability (defensive copying) shows up in the \`Schedule\` exercise where
+the field is a mutable array.
+
+**Constructor validation enforces the invariant once, for life.** By throwing in the
+constructor when the currency code is invalid, every \`Money\` object that exists is
+guaranteed to hold a valid 3-letter code. Callers never need to recheck. This is the
+*fail-fast* principle: catch illegal state at the boundary, not scattered across
+business logic.
+
+**\`plus\` returns a new object.** No mutation of \`this\` or \`other\` — the result is a
+fresh \`Money\`. This is the standard immutable-update pattern used throughout the JDK
+(\`String.toUpperCase\`, \`BigDecimal.add\`, \`LocalDate.plusDays\` all work the same way).
+Callers can safely share \`Money\` references across threads without synchronisation.
+
+**Value equality via \`equals\`/\`hashCode\`.** Two \`Money\` objects with the same amount
+and currency are equal regardless of when or where they were constructed. The
+implementation uses the canonical five-step \`equals\` pattern: identity shortcut,
+\`instanceof\` null-safe check, cast, field comparison. \`Objects.hash\` bundles both
+fields into a consistent hash. Together they make \`Money\` safe to use as a key in
+\`HashMap\` or element in \`HashSet\`.
+
+**Integer-only \`toString\`** avoids floating-point rounding by keeping arithmetic in
+\`long\`. \`Math.abs\` extracts unsigned whole units and fractional cents; \`%02d\` pads
+the cents to two digits so \`Money(5, "USD")\` prints \`"0.05 USD"\` rather than \`"0.5 USD"\`.`,
     },
     {
       id: 'hashcode-break',

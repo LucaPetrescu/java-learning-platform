@@ -249,57 +249,94 @@ is no true rectangular 2D array in Java.`,
   ],
   exercises: [
     {
-      id: 'predict-output',
-      title: 'Predict the output',
+      id: 'reverse-integer',
+      title: 'Reverse an integer (overflow-safe)',
       difficulty: 'warmup',
-      prompt: `Before running it, **predict the exact output of every line** below and write a
-one-sentence reason for each. Then run it in your IDE and reconcile any surprises. This
-is exactly the kind of "what does this print?" question that screens for real
-understanding.
+      prompt: `Implement \`static int reverse(int x)\` that reverses the decimal digits of a
+32-bit signed integer. If the reversed value would overflow the \`int\` range
+\`[-2147483648, 2147483647]\`, return \`0\` instead of wrapping.
 
-~~~java
-public class Predict {
-    public static void main(String[] args) {
-        System.out.println(0.1 + 0.2);                 // A
-        System.out.println(Integer.MAX_VALUE + 1);      // B
-        Integer x = 100, y = 100;
-        System.out.println(x == y);                     // C
-        Integer p = 200, q = 200;
-        System.out.println(p == q);                     // D
-        System.out.println('A' + 1);                    // E
-        System.out.println("" + 'A' + 1);               // F
-        System.out.println(5 / 2 * 2.0);                // G
+Examples:
+
+~~~text
+reverse(123)         ->  321
+reverse(-120)        ->  -21   (trailing zero drops off)
+reverse(1534236469)  ->    0   (reversed value overflows int)
+~~~
+
+Requirements:
+- Do **not** convert to a \`String\` — extract digits with \`%\` and \`/\`.
+- Negative sign is preserved; a trailing zero on the original becomes a leading zero
+  on the reversed value and is simply dropped (integer semantics).
+- Overflow must be detected **before** it happens — do not let the value wrap and check
+  afterwards.
+
+The combination of modulo/integer-division digit extraction and pre-overflow detection
+is the whole point of this exercise.`,
+      starter: `public class ReverseInteger {
+
+    /**
+     * Reverses the decimal digits of x.
+     * Returns 0 if the reversed value overflows int range.
+     */
+    static int reverse(int x) {
+        // TODO 1: use a long accumulator to collect the reversed digits
+        // TODO 2: in the loop, peel the last digit with (x % 10), append to accumulator,
+        //         then shrink x with (x / 10); repeat until x == 0
+        // TODO 3: after the loop, check whether the accumulator fits in an int;
+        //         if not, return 0
+        return 0;
     }
-}
-~~~`,
-      starter: `// Write your prediction for A–G as comments, then run to check.
-// A:
-// B:
-// C:
-// D:
-// E:
-// F:
-// G:`,
+
+    public static void main(String[] args) {
+        System.out.println(reverse(123));          // 321
+        System.out.println(reverse(-120));         // -21
+        System.out.println(reverse(0));            // 0
+        System.out.println(reverse(1534236469));   // 0  (overflow)
+    }
+}`,
       hints: [
-        'C and D differ because of the Integer cache (-128..127 are interned, so == is true only in that range).',
-        'F is left-associative: "" + \'A\' is the String "A" first, so 1 is then appended as text, not added numerically.',
-        'G evaluates 5 / 2 as integer division (= 2) BEFORE multiplying by 2.0.',
+        'Use a \`long rev = 0\` accumulator. Each iteration: \`rev = rev * 10 + (x % 10)\`, then \`x /= 10\`. Java\'s \`%\` preserves sign for negative operands, so negative inputs are handled automatically.',
+        'After the loop, check \`rev > Integer.MAX_VALUE || rev < Integer.MIN_VALUE\`. If either is true, return \`0\`; otherwise return \`(int) rev\`.',
+        'You can also detect overflow at each step without a \`long\`: before \`rev = rev * 10 + digit\`, verify \`rev > Integer.MAX_VALUE / 10\` (or \`rev < Integer.MIN_VALUE / 10\`) and bail early. The \`long\` approach is simpler and equally correct.',
       ],
-      solution: `// A: 0.30000000000000004   — binary floating point can't represent 0.1/0.2/0.3 exactly
-// B: -2147483648          — int overflow wraps around (MAX_VALUE + 1)
-// C: true                 — 100 is in the Integer cache (-128..127), same cached object
-// D: false                — 200 is outside the cache, so x and y are distinct objects
-// E: 66                   — 'A' (65) is promoted to int and added; result is an int
-// F: A1                   — "" + 'A' makes the String "A"; then + 1 appends "1"
-// G: 4.0                  — 5/2 is integer division (2), then 2 * 2.0 == 4.0`,
-      explanation: `Every line here is a classic trap. **A** is the floating-point representation problem —
-never compare doubles with \`==\`. **B** is silent integer overflow. **C/D** expose the
-\`Integer\` cache: boxed values from -128 to 127 are interned, so \`==\` (identity) is
-accidentally \`true\` in that range and \`false\` outside it — always use \`.equals()\` on boxed
-types. **E** shows \`char\` is numeric and promotes to \`int\` in arithmetic. **F** is operator
-associativity: string concatenation is left-to-right, so once a \`String\` is in play the
-rest is concatenation. **G** is integer division happening before the promotion to
-\`double\`. If you got all seven, your mental model of core Java is solid.`,
+      solution: `public class ReverseInteger {
+
+    static int reverse(int x) {
+        long rev = 0;
+        while (x != 0) {
+            rev = rev * 10 + (x % 10);   // x % 10 is negative when x < 0
+            x /= 10;
+        }
+        if (rev > Integer.MAX_VALUE || rev < Integer.MIN_VALUE) return 0;
+        return (int) rev;
+    }
+
+    public static void main(String[] args) {
+        System.out.println(reverse(123));          // 321
+        System.out.println(reverse(-120));         // -21
+        System.out.println(reverse(0));            // 0
+        System.out.println(reverse(1534236469));   // 0
+    }
+}`,
+      explanation: `**Digit extraction** uses the two integer operations that every Java developer must know:
+\`x % 10\` gives the last digit (negative when \`x\` is negative, which is exactly what we
+want), and \`x /= 10\` truncates the last digit. Repeating until \`x == 0\` peels all digits
+in reverse order.
+
+**Overflow detection** is the key insight. Accumulating into a \`long\` lets us represent
+any reversed 32-bit integer without wrapping — the largest possible reversal is
+\`9646324351\` (reversing \`Integer.MIN_VALUE\`'s magnitude), which fits in a \`long\` but not
+an \`int\`. A single range check after the loop is all that is needed.
+
+**Why not use a String?** Converting to a string hides the arithmetic mechanics — the
+integer-division loop is the pattern you reach for in dozens of other problems (digit sum,
+palindrome number, to-arbitrary-base conversion). Practising it here makes it automatic.
+
+**Trailing-zero handling** is free: \`reverse(-120)\` → digits extracted are \`0, 2, 1\`
+→ \`rev\` accumulates to \`-21\`. The leading zero on the reversed sequence is simply never
+appended as a meaningful digit because \`rev * 10 + 0\` leaves \`rev\` at \`0\` at that step,
+then the next non-zero digit pushes it to the correct value.`,
     },
     {
       id: 'safe-parse-int',

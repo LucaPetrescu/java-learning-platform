@@ -347,159 +347,135 @@ to the result type.`,
   ],
   exercises: [
     {
-      id: 'stream-pitfalls-predict',
-      title: 'Predict the output — stream gotchas',
+      id: 'vowel-names-pipeline',
+      title: 'Build a vowel-name formatter pipeline',
       difficulty: 'warmup',
-      prompt: `For each snippet, predict what happens (output, exception, or silent misbehavior)
-**before running it**. Write your answer as a comment, then verify.
+      prompt: `Implement \`static String vowelNames(List<String> names)\` that builds **one stream
+pipeline** (no loops, no intermediate variables) satisfying all of these requirements:
+
+1. Keep only names whose **first character is a vowel** (a, e, i, o, u — case-insensitive).
+2. Upper-case every kept name.
+3. Remove duplicates.
+4. Sort the remaining names alphabetically.
+5. Join them into a single \`String\` separated by \`", "\`.
+6. Return an **empty string** when the input is \`null\`, empty, or no name passes the filter.
 
 ~~~java
-// Snippet A
-Stream<String> s = Stream.of("one", "two", "three");
-long n = s.count();
-s.forEach(System.out::println);
+List<String> names = List.of(
+    "alice", "Bob", "Eve", "alice", "Ivan", "Uma", "Carol", "eve", "oscar"
+);
+System.out.println(vowelNames(names));
+~~~
 
-// Snippet B
-List<String> collected = new ArrayList<>();
-long found = Stream.of("a", "b", "c", "d")
-    .peek(collected::add)
-    .filter(x -> x.compareTo("b") >= 0)
-    .findFirst()
-    .map(x -> 1L).orElse(0L);
-System.out.println(collected.size());
+Expected output:
 
-// Snippet C
-Optional<Integer> empty = Optional.empty();
-int value = empty.get();
-System.out.println(value);
+~~~text
+ALICE, EVE, IVAN, OSCAR, UMA
+~~~
 
-// Snippet D
-int sum = Stream.of(1, 2, 3, 4, 5)
-    .mapToInt(Integer::intValue)
-    .sum();
-System.out.println(sum);
-
-// Snippet E  — boxed stream sum trap
-long total = 0L;
-Stream.of(1, 2, 3)
-    .reduce(0, (a, b) -> a + b);   // assigned to nothing
-System.out.println(total);
-~~~`,
+Requirements enforced by the tests:
+- \`"alice"\` appears only once even though it is in the list twice (after upper-casing).
+- \`"Eve"\` and \`"eve"\` both map to \`"EVE"\` — deduplicated to one entry.
+- \`"Bob"\` and \`"Carol"\` are excluded (do not start with a vowel).
+- Result is alphabetically ordered: ALICE < EVE < IVAN < OSCAR < UMA.
+- A \`null\` or empty input returns \`""\`.`,
       starter: `import java.util.*;
 import java.util.stream.*;
 
-public class StreamPitfalls {
+public class VowelNames {
+
+    static final String VOWELS = "aeiou";
+
+    static String vowelNames(List<String> names) {
+        if (names == null || names.isEmpty()) return "";
+
+        return names.stream()
+            // TODO 1: filter — keep names whose first char (lower-cased) is in VOWELS
+            //         hint: use String::toLowerCase or Character.toLowerCase
+            // TODO 2: map — upper-case each name (method reference preferred)
+            // TODO 3: remove duplicates
+            // TODO 4: sort alphabetically (natural order)
+            // TODO 5: collect with Collectors.joining(", ")
+            .collect(Collectors.joining()); // placeholder — fix the pipeline above
+    }
+
     public static void main(String[] args) {
+        List<String> names = List.of(
+            "alice", "Bob", "Eve", "alice", "Ivan", "Uma", "Carol", "eve", "oscar"
+        );
+        System.out.println(vowelNames(names));
+        // Expected: ALICE, EVE, IVAN, OSCAR, UMA
 
-        // Snippet A — predict: ________________
-        try {
-            Stream<String> s = Stream.of("one", "two", "three");
-            long n = s.count();
-            s.forEach(System.out::println);
-        } catch (Exception e) {
-            System.out.println("A threw: " + e.getClass().getSimpleName());
-        }
+        System.out.println(vowelNames(List.of()));
+        // Expected: (empty string)
 
-        // Snippet B — predict: collected.size() == ________________
-        List<String> collected = new ArrayList<>();
-        long found = Stream.of("a", "b", "c", "d")
-            .peek(collected::add)
-            .filter(x -> x.compareTo("b") >= 0)
-            .findFirst()
-            .map(x -> 1L).orElse(0L);
-        System.out.println("B collected.size() = " + collected.size());
-
-        // Snippet C — predict: ________________
-        try {
-            Optional<Integer> empty = Optional.empty();
-            int value = empty.get();
-            System.out.println("C value = " + value);
-        } catch (Exception e) {
-            System.out.println("C threw: " + e.getClass().getSimpleName());
-        }
-
-        // Snippet D — predict: ________________
-        int sum = Stream.of(1, 2, 3, 4, 5)
-            .mapToInt(Integer::intValue)
-            .sum();
-        System.out.println("D sum = " + sum);
-
-        // Snippet E — predict: ________________
-        long total = 0L;
-        Stream.of(1, 2, 3).reduce(0, (a, b) -> a + b); // result discarded
-        System.out.println("E total = " + total);
+        System.out.println(vowelNames(List.of("Bob", "Carol", "Dave")));
+        // Expected: (empty string — no vowel starters)
     }
 }`,
       hints: [
-        'A: a stream\'s terminal operation closes it — calling a second terminal on the same stream object throws IllegalStateException.',
-        'B: findFirst is a short-circuit terminal. Peek only runs for elements that reach it before the pipeline stops. Consider which elements get pulled through before findFirst returns.',
-        'E: reduce returns a value — it does not mutate the variable named total. The result is silently discarded and total remains 0.',
+        'filter: \`s -> !s.isEmpty() && VOWELS.indexOf(Character.toLowerCase(s.charAt(0))) >= 0\` — or equivalently \`s -> VOWELS.contains(String.valueOf(s.charAt(0)).toLowerCase())\`.',
+        'After \`filter\`, chain \`.map(String::toUpperCase)\` (method reference), then \`.distinct()\`, then \`.sorted()\` (natural order is fine here — \`Comparator.naturalOrder()\` also works but is redundant).',
+        '\`Collectors.joining(", ")\` is the terminal — it accumulates the stream of strings into a single delimited string. Place it at the very end of the pipeline.',
       ],
       solution: `import java.util.*;
 import java.util.stream.*;
 
-public class StreamPitfalls {
+public class VowelNames {
+
+    static final String VOWELS = "aeiou";
+
+    static String vowelNames(List<String> names) {
+        if (names == null || names.isEmpty()) return "";
+
+        return names.stream()
+            .filter(s -> !s.isEmpty()
+                && VOWELS.indexOf(Character.toLowerCase(s.charAt(0))) >= 0)
+            .map(String::toUpperCase)
+            .distinct()
+            .sorted()
+            .collect(Collectors.joining(", "));
+    }
+
     public static void main(String[] args) {
+        List<String> names = List.of(
+            "alice", "Bob", "Eve", "alice", "Ivan", "Uma", "Carol", "eve", "oscar"
+        );
+        System.out.println(vowelNames(names));
+        // ALICE, EVE, IVAN, OSCAR, UMA
 
-        // A: IllegalStateException — stream already consumed by count()
-        try {
-            Stream<String> s = Stream.of("one", "two", "three");
-            long n = s.count();
-            s.forEach(System.out::println);
-        } catch (Exception e) {
-            System.out.println("A threw: " + e.getClass().getSimpleName());
-            // prints: A threw: IllegalStateException
-        }
+        System.out.println(vowelNames(List.of()));
+        // (empty string)
 
-        // B: collected.size() == 2 (elements "a" and "b" are peeked before findFirst returns)
-        List<String> collected = new ArrayList<>();
-        long found = Stream.of("a", "b", "c", "d")
-            .peek(collected::add)
-            .filter(x -> x.compareTo("b") >= 0)
-            .findFirst()
-            .map(x -> 1L).orElse(0L);
-        System.out.println("B collected.size() = " + collected.size());
-        // prints: B collected.size() = 2  ("a" fails filter, "b" passes -> findFirst returns)
-
-        // C: NoSuchElementException — get() on an empty Optional
-        try {
-            Optional<Integer> empty = Optional.empty();
-            int value = empty.get();
-            System.out.println("C value = " + value);
-        } catch (Exception e) {
-            System.out.println("C threw: " + e.getClass().getSimpleName());
-            // prints: C threw: NoSuchElementException
-        }
-
-        // D: 15 — mapToInt avoids boxing, sum() is clean
-        int sum = Stream.of(1, 2, 3, 4, 5)
-            .mapToInt(Integer::intValue)
-            .sum();
-        System.out.println("D sum = " + sum);   // D sum = 15
-
-        // E: 0 — reduce returns a new value; the variable total is never updated
-        long total = 0L;
-        Stream.of(1, 2, 3).reduce(0, (a, b) -> a + b);
-        System.out.println("E total = " + total);   // E total = 0
+        System.out.println(vowelNames(List.of("Bob", "Carol", "Dave")));
+        // (empty string)
     }
 }`,
-      explanation: `**A** exposes the once-only contract: after \`count()\` the stream is closed; a second
-terminal throws \`IllegalStateException\`. Store the source (\`List\`), never the \`Stream\`.
+      explanation: `The pipeline applies five intermediate operations in a fixed order before the terminal:
 
-**B** is the canonical \`peek\` gotcha. The pipeline pulls elements one at a time through
-filter until \`findFirst\` gets a match. \`"a"\` is peeked and fails the filter;
-\`"b"\` is peeked and passes, so \`findFirst\` returns immediately — \`"c"\` and \`"d"\` are
-never touched. \`collected.size()\` is 2, not 4.
+**\`filter\`** keeps only names whose first character (lowercased) appears in the vowel
+string. \`Character.toLowerCase\` handles mixed-case input without allocating a full new
+string for every element — cheaper than \`s.toLowerCase().charAt(0)\`.
 
-**C** is the most common \`Optional\` error: \`get()\` on an empty \`Optional\` throws
-\`NoSuchElementException\` (not \`NullPointerException\`). Use \`orElse\`, \`orElseGet\`,
-\`ifPresent\`, or \`orElseThrow\`.
+**\`map(String::toUpperCase)\`** is a stateless, one-to-one transform. Using a method
+reference instead of a lambda \`(s -> s.toUpperCase())\` is idiomatic and slightly clearer.
 
-**D** is the correct idiom: \`Stream.of(Integer...)\` followed by \`mapToInt\` and \`sum()\`
-avoids boxing intermediate results.
+**\`distinct()\`** is a **stateful** intermediate op: it buffers seen elements in an internal
+\`HashSet\` to suppress duplicates. It must come *after* \`map\` so that \`"alice"\` and
+\`"eve"\` are already in their canonical upper-case form when deduplication runs.
 
-**E** is a pure assignment bug: \`reduce\` is pure and returns its result. Not assigning
-the return value silently discards it. \`total\` stays 0 forever.`,
+**\`sorted()\`** with no argument uses natural (lexicographic) order. It is also stateful and
+must drain the full stream before the next stage can begin — placing it after \`distinct\`
+minimises the number of elements it has to sort.
+
+**\`Collectors.joining(", ")\`** is the terminal that accumulates the stream into a
+\`String\` with a delimiter. It is strictly more efficient than \`reduce("", (a,b) -> a + ", " + b)\`
+because it uses a \`StringJoiner\` (backed by a \`StringBuilder\`) internally — no repeated
+string concatenation.
+
+The null/empty guard at the top keeps the pipeline clean: it avoids a \`NullPointerException\`
+from \`null.stream()\` and short-circuits the empty-list case to return \`""\` without
+constructing a stream at all.`,
     },
     {
       id: 'department-analytics',

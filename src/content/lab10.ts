@@ -313,199 +313,179 @@ Effective Java Item 31.`,
   ],
   exercises: [
     {
-      id: 'erasure-spotter',
-      title: 'Spot the erasure bug',
+      id: 'pair-and-repeat',
+      title: 'Generic Pair record and repeat utility',
       difficulty: 'warmup',
-      prompt: `Each of the five snippets below either **fails to compile** or **compiles but has
-a runtime trap**. For each one: (a) state what happens and why, (b) write the corrected
-version.
+      prompt: `Implement two independent generic constructs in a single file.
+
+**Part A — \`Pair<A, B>\` record**
+
+Define a generic record:
 
 ~~~java
-// Snippet 1
-static <T> T[] makeArray(int n) {
-    return (T[]) new Object[n];    // unchecked cast — is this safe?
-}
-String[] arr = makeArray(3);
-arr[0] = "hello";
+public record Pair<A, B>(A first, B second) { ... }
+~~~
 
-// Snippet 2
-static void print(List<? extends Number> list) {
-    list.add(Integer.valueOf(1));  // why won't this compile?
-}
+Add:
 
-// Snippet 3
-class Wrapper<T> {
-    void doSomething(Object o) {
-        if (o instanceof List<String>) {  // compile error?
-            System.out.println("list of strings");
-        }
+1. An instance method \`Pair<B, A> swapped()\` that returns a new \`Pair\` with
+   the components in reverse order.
+2. A static factory method \`static <A, B> Pair<A, B> of(A a, B b)\` so callers
+   can write \`Pair.of("hello", 42)\` without spelling out the type arguments.
+
+**Part B — \`repeat\` utility method**
+
+In the same file, add a static generic method (outside the record, in a wrapper
+class \`PairDemo\`):
+
+~~~java
+static <T> List<T> repeat(T value, int n)
+~~~
+
+It must return a new, **mutable** \`ArrayList\` containing \`value\` repeated \`n\`
+times. Throw \`IllegalArgumentException\` when \`n < 0\`.
+
+**In \`main\`**, demonstrate:
+- \`Pair.of("London", 8_799_800).swapped()\` prints \`Pair[first=8799800, second=London]\`
+- A \`Pair<Boolean, List<String>>\` to show nesting works.
+- \`repeat("go", 4)\` returns \`[go, go, go, go]\`.
+- \`repeat(0, 0)\` returns \`[]\`.
+- Calling \`repeat(null, 3)\` is allowed and returns \`[null, null, null]\`.`,
+      starter: `import java.util.ArrayList;
+import java.util.List;
+
+// Part A: generic record — a record is implicitly final and provides
+// a canonical constructor, equals, hashCode, and toString for free.
+record Pair<A, B>(A first, B second) {
+
+    // TODO: static factory — lets callers write Pair.of(a, b) without
+    // spelling out the type arguments explicitly.
+    public static <A, B> Pair<A, B> of(A a, B b) {
+        // TODO
+        return null;
+    }
+
+    // TODO: instance method — returns a NEW Pair with components swapped.
+    public Pair<B, A> swapped() {
+        // TODO
+        return null;
     }
 }
 
-// Snippet 4
-class Util {
-    static void handle(List<String>  xs) { System.out.println("strings"); }
-    static void handle(List<Integer> xs) { System.out.println("integers"); }
-}
+public class PairDemo {
 
-// Snippet 5
-static <T> void swap(List<T> list, int i, int j) {
-    list.set(i, list.set(j, list.get(i)));  // does this actually work?
-}
-~~~
-
-Write your analysis as comments, then provide corrected/safe versions for those
-that need fixing.`,
-      starter: `import java.util.ArrayList;
-import java.util.List;
-import java.lang.reflect.Array;
-
-public class ErasureSpotter {
-
-    // --- Snippet 1 analysis and fix ---
-    // What happens:
-    // Fix:
-
-    // --- Snippet 2 analysis and fix ---
-    // What happens:
-    // Fix:
-
-    // --- Snippet 3 analysis and fix ---
-    // What happens:
-    // Fix:
-
-    // --- Snippet 4 analysis ---
-    // What happens:
-    // Fix:
-
-    // --- Snippet 5 analysis ---
-    // What happens:
+    // Part B: generic utility method.
+    // Returns a mutable ArrayList so callers can add to it later.
+    public static <T> List<T> repeat(T value, int n) {
+        // TODO: throw IllegalArgumentException when n < 0
+        // TODO: build and return the list
+        return null;
+    }
 
     public static void main(String[] args) {
-        // Demonstrate each corrected version compiles and behaves correctly
+        // --- Part A demos ---
+        // TODO: Pair.of("London", 8_799_800) and call swapped()
+        // TODO: nested Pair<Boolean, List<String>>
+
+        // --- Part B demos ---
+        // TODO: repeat("go", 4)
+        // TODO: repeat(0, 0)
+        // TODO: repeat(null, 3)
     }
 }`,
       hints: [
-        'Snippet 1: the cast to T[] succeeds at the makeArray call-site (T is erased to Object, so Object[] is Object[]), but the *assignment* String[] arr = ... triggers an invisible cast inserted by the compiler — that is where the ClassCastException fires.',
-        'Snippet 2: the compiler cannot allow writes into List<? extends Number> because the actual element type could be List<Double> or List<Long> — adding an Integer would corrupt it. The fix is List<Number> or a consumer wildcard List<? super Integer>.',
-        'Snippet 3: instanceof requires a reifiable type. List<String> is not reifiable (erased to List). Use List<?> instead. Snippet 4: both overloads erase to handle(List) — the fix is distinct method names.',
+        'The static factory is one line: \`return new Pair<>(a, b);\`. The diamond operator works here because the compiler infers \`A\` and \`B\` from the arguments.',
+        '\`swapped()\` is also one line: \`return new Pair<>(second, first);\`. Notice the type parameters flip — the return type is \`Pair<B, A>\`, not \`Pair<A, B>\`.',
+        'For \`repeat\`: guard with \`if (n < 0) throw new IllegalArgumentException(...)\`, then create an \`ArrayList<T>(n)\` and fill it with a loop calling \`list.add(value)\`. Passing \`null\` as value is legal — \`ArrayList\` allows \`null\` elements.',
       ],
       solution: `import java.util.ArrayList;
 import java.util.List;
-import java.lang.reflect.Array;
 
-public class ErasureSpotter {
+record Pair<A, B>(A first, B second) {
 
-    // ---- Snippet 1 ----
-    // The unchecked cast (T[]) new Object[n] succeeds at runtime because at runtime
-    // T is erased to Object, so you are really casting Object[] to Object[] — no problem.
-    // BUT the compiler inserts a hidden cast at the *call site*:
-    //   String[] arr = makeArray(3);
-    // becomes String[] arr = (String[]) makeArray(3);
-    // and at runtime makeArray returns an Object[], NOT a String[].
-    // Result: ClassCastException at the assignment line, not inside makeArray.
-    //
-    // Safe fix: accept a Class<T> token so you can create the right array type:
-    @SuppressWarnings("unchecked")
-    static <T> T[] makeArray(Class<T> type, int n) {
-        // Array.newInstance creates an array of the exact runtime type
-        return (T[]) Array.newInstance(type, n);
+    // Static factory: type arguments A and B are inferred from the call-site arguments,
+    // so callers never have to write Pair.<String, Integer>of(...).
+    public static <A, B> Pair<A, B> of(A a, B b) {
+        return new Pair<>(a, b);
     }
 
-    // ---- Snippet 2 ----
-    // list.add(Integer.valueOf(1)) does NOT compile.
-    // Reason: List<? extends Number> is a producer — the actual list at runtime could
-    // be a List<Double>. Writing an Integer into it would be a type violation.
-    // ? extends T is read-only from the perspective of the generic parameter.
-    //
-    // Fix A: accept List<Number> if you need to write:
-    static void addOne_A(List<Number> list) {
-        list.add(Integer.valueOf(1));
+    // swapped: the return type is Pair<B, A> — the type parameters are deliberately
+    // reversed to mirror the component order.
+    public Pair<B, A> swapped() {
+        return new Pair<>(second, first);
     }
-    // Fix B: accept List<? super Integer> if you want flexibility on the receiver:
-    static void addOne_B(List<? super Integer> list) {
-        list.add(Integer.valueOf(1));
-    }
+}
 
-    // ---- Snippet 3 ----
-    // instanceof requires a *reifiable* type — one whose type information is fully
-    // available at runtime. Parameterized types like List<String> are not reifiable
-    // (they are erased to List). The compiler rejects it.
-    //
-    // Fix: use the unbounded wildcard, which IS reifiable:
-    static void wrapper(Object o) {
-        if (o instanceof List<?>) {
-            System.out.println("some kind of list");
+public class PairDemo {
+
+    // repeat: generic method — T is inferred from the value argument.
+    // Returns a mutable ArrayList so callers can continue adding elements.
+    public static <T> List<T> repeat(T value, int n) {
+        if (n < 0) {
+            throw new IllegalArgumentException(
+                "n must be >= 0, got: " + n);
         }
-        // With JDK 16+ pattern matching you can do:
-        if (o instanceof List<?> list && !list.isEmpty()) {
-            System.out.println("non-empty list, first element: " + list.get(0));
+        List<T> result = new ArrayList<>(n);
+        for (int i = 0; i < n; i++) {
+            result.add(value);
         }
-    }
-
-    // ---- Snippet 4 ----
-    // Both overloads erase to handle(List) — duplicate method, compile error.
-    // Fix: use distinct names.
-    static void handleStrings(List<String>  xs) { System.out.println("strings");  }
-    static void handleIntegers(List<Integer> xs) { System.out.println("integers"); }
-
-    // ---- Snippet 5 ----
-    // list.set(int, E) returns the *previous* element at that index.
-    // So list.set(j, list.get(i)) puts a[i] at position j and returns a[j] (old value).
-    // Then list.set(i, <that old value>) puts a[j] at position i.
-    // Net effect: a correct in-place swap with no temporary variable.
-    // This is genuinely safe and is a nice trick.
-    static <T> void swap(List<T> list, int i, int j) {
-        list.set(i, list.set(j, list.get(i)));
+        return result;
     }
 
     public static void main(String[] args) {
-        // Snippet 1 fix
-        String[] arr = makeArray(String.class, 3);
-        arr[0] = "hello";
-        System.out.println(arr[0]);   // hello — no ClassCastException
+        // --- Part A: Pair ---
 
-        // Snippet 2 fix
-        List<Number> nums = new ArrayList<>();
-        addOne_A(nums);
-        System.out.println(nums);     // [1]
+        Pair<String, Integer> cityPop = Pair.of("London", 8_799_800);
+        System.out.println(cityPop);            // Pair[first=London, second=8799800]
+        System.out.println(cityPop.swapped());  // Pair[first=8799800, second=London]
 
-        List<Object> objs = new ArrayList<>();
-        addOne_B(objs);
-        System.out.println(objs);     // [1]
+        // Nesting: Pair whose second component is itself a List<String>
+        Pair<Boolean, List<String>> nested =
+            Pair.of(true, List.of("alpha", "beta", "gamma"));
+        System.out.println(nested.first());     // true
+        System.out.println(nested.second());    // [alpha, beta, gamma]
+        // swapped() works on nested types too:
+        Pair<List<String>, Boolean> flipped = nested.swapped();
+        System.out.println(flipped.first());    // [alpha, beta, gamma]
 
-        // Snippet 3 fix
-        wrapper(List.of("a", "b"));   // some kind of list / non-empty list, first element: a
+        // --- Part B: repeat ---
 
-        // Snippet 4 fix
-        handleStrings(List.of("x"));   // strings
-        handleIntegers(List.of(1));    // integers
+        List<String> words = repeat("go", 4);
+        System.out.println(words);              // [go, go, go, go]
+        words.add("stop");                      // mutable — this must work
+        System.out.println(words);              // [go, go, go, go, stop]
 
-        // Snippet 5 verification
-        List<Integer> data = new ArrayList<>(List.of(1, 2, 3, 4, 5));
-        swap(data, 0, 4);
-        System.out.println(data);     // [5, 2, 3, 4, 1]
+        List<Integer> empty = repeat(0, 0);
+        System.out.println(empty);              // []
+
+        List<String> nulls = repeat(null, 3);
+        System.out.println(nulls);              // [null, null, null]
+
+        // Negative n throws:
+        try {
+            repeat("x", -1);
+        } catch (IllegalArgumentException e) {
+            System.out.println("Caught: " + e.getMessage()); // n must be >= 0, got: -1
+        }
     }
 }`,
-      explanation: `**Snippet 1** is the canonical heap-pollution trap. Because \`T\` is erased at runtime,
-\`(T[]) new Object[n]\` is a no-op cast inside \`makeArray\` — the method returns a plain
-\`Object[]\`. The real cast is inserted at the call site by the compiler, and that cast
-to \`String[]\` fails because \`Object[]\` is not a \`String[]\`. The fix uses
-\`Array.newInstance\` with a \`Class<T>\` token to create the correct array type at runtime;
-the single \`@SuppressWarnings\` is justified because we can see the cast is safe.
+      explanation: `**\`Pair<A, B>\` as a record** gives you \`equals\`, \`hashCode\`, and \`toString\` for
+free. The two type parameters \`A\` and \`B\` are independent, so \`Pair<String, Integer>\`
+and \`Pair<Integer, String>\` are distinct types — the compiler enforces this and
+\`swapped()\`'s return type \`Pair<B, A>\` captures that flip statically.
 
-**Snippet 2** shows that \`? extends T\` is strictly a *read* wildcard. The compiler
-prevents any write (other than \`null\`) because it cannot guarantee the actual element
-type won't be violated. PECS: if you need to write, use \`? super T\` (consumer).
+The **static factory** \`of\` is a generic *method* (its own \`<A, B>\` type parameters)
+rather than relying on the record's type parameters directly. This lets the compiler
+infer both type arguments from the call-site arguments, which is why \`Pair.of("x", 1)\`
+works without any explicit type witness.
 
-**Snippet 3**: only *reifiable* types are legal in \`instanceof\`. Reifiable = fully
-known at runtime. Parameterized types are erased; unbounded wildcards and raw types are
-reifiable.
-
-**Snippet 4** is a pure erasure collision — fix with distinct names.
-
-**Snippet 5** is a valid trick: \`List.set\` returns the displaced element, making a
-one-line no-temp-var swap possible on any \`List<T>\`.`,
+**\`repeat\`** illustrates a standalone generic method — the type parameter \`T\` is
+scoped to the method, not to any enclosing class. Returning a mutable \`ArrayList\`
+(rather than \`List.of\`) is a deliberate API choice: callers who only need a read-only
+view can assign it to \`List<T>\`, while callers who need to append can keep the
+\`ArrayList<T>\` reference. The \`null\` case is intentionally allowed — restricting it
+would require a separate overload or a nullable annotation, adding complexity that the
+exercise does not warrant.`,
     },
     {
       id: 'generic-sort',
