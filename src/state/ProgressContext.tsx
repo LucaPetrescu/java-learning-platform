@@ -126,7 +126,7 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
     }
   }, [user])
 
-  // Persist: debounced upsert to Supabase, or localStorage as a guest.
+  // Persist: upsert to Supabase, or localStorage as a guest.
   useEffect(() => {
     if (!hydrated.current) return
 
@@ -135,11 +135,7 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    const timer = setTimeout(() => {
-      supabase.from('progress').upsert({ user_id: user.id, ...state })
-    }, 500)
-
-    return () => clearTimeout(timer)
+    supabase.from('progress').upsert({ user_id: user.id, ...state })
   }, [state, user])
 
   const toggleExercise = useCallback((id: string) => {
