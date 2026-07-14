@@ -97,12 +97,13 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
     let cancelled = false
 
     async function hydrate() {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('progress')
         .select('exercises, reading, tasks')
         .eq('user_id', user!.id)
         .maybeSingle()
 
+      if (error) console.error('[progress] select failed:', error)
       if (cancelled) return
 
       if (data) {
@@ -114,7 +115,10 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
       } else {
         // First sign-in: migrate whatever was saved locally as a guest.
         const local = loadLocal()
-        await supabase.from('progress').insert({ user_id: user!.id, ...local })
+        const { error: insertError } = await supabase
+          .from('progress')
+          .insert({ user_id: user!.id, ...local })
+        if (insertError) console.error('[progress] insert failed:', insertError)
         setState(local)
       }
       hydrated.current = true
@@ -135,7 +139,12 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    supabase.from('progress').upsert({ user_id: user.id, ...state })
+    supabase
+      .from('progress')
+      .upsert({ user_id: user.id, ...state })
+      .then(({ error }) => {
+        if (error) console.error('[progress] upsert failed:', error)
+      })
   }, [state, user])
 
   const toggleExercise = useCallback((id: string) => {
