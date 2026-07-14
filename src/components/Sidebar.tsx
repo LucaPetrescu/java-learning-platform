@@ -1,38 +1,45 @@
-import { NavLink } from 'react-router-dom'
-import { javaLabs, springLabs, projects, labs } from '../content'
-import type { Lab } from '../content/types'
-import { useProgress } from '../state/ProgressContext'
-import { labProgress, projectProgress } from '../lib/ids'
+import { NavLink } from "react-router-dom";
+import { javaLabs, springLabs, projects, labs } from "../content";
+import type { Lab } from "../content/types";
+import { useProgress } from "../state/ProgressContext";
+import { useAuth } from "../state/AuthContext";
+import { labProgress, projectProgress } from "../lib/ids";
 
 function LabLink({ lab }: { lab: Lab }) {
-  const { exercises, reading } = useProgress()
-  const p = labProgress(lab, exercises, reading)
-  const dotClass = p.complete ? 'done' : p.ratio > 0 ? 'partial' : ''
+  const { exercises, reading } = useProgress();
+  const p = labProgress(lab, exercises, reading);
+  const dotClass = p.complete ? "done" : p.ratio > 0 ? "partial" : "";
   return (
     <NavLink
       to={`/lab/${lab.id}`}
-      className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+      className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}
     >
-      <span className="nav-link__num">{String(lab.number).padStart(2, '0')}</span>
+      <span className="nav-link__num">
+        {String(lab.number).padStart(2, "0")}
+      </span>
       <span className="nav-link__text">{lab.title}</span>
       <span className={`nav-dot ${dotClass}`} />
     </NavLink>
-  )
+  );
 }
 
 export function Sidebar() {
-  const { exercises, reading, tasks, reset } = useProgress()
+  const { exercises, reading, tasks, reset } = useProgress();
+  const { user, signOut } = useAuth();
 
   // Total progress across every lab (Core Java + Spring), driven by completed
   // exercises. Updates live whenever an exercise is toggled.
-  let doneExercises = 0
-  let totalExercises = 0
+  let doneExercises = 0;
+  let totalExercises = 0;
   for (const lab of labs) {
-    const p = labProgress(lab, exercises, reading)
-    doneExercises += p.doneExercises
-    totalExercises += p.totalExercises
+    const p = labProgress(lab, exercises, reading);
+    doneExercises += p.doneExercises;
+    totalExercises += p.totalExercises;
   }
-  const pct = totalExercises === 0 ? 0 : Math.round((doneExercises / totalExercises) * 100)
+  const pct =
+    totalExercises === 0
+      ? 0
+      : Math.round((doneExercises / totalExercises) * 100);
 
   return (
     <aside className="sidebar">
@@ -44,15 +51,25 @@ export function Sidebar() {
         </div>
       </NavLink>
 
-      <NavLink to="/" end className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+      <NavLink
+        to="/"
+        end
+        className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}
+      >
         <span className="nav-link__num">⌂</span>
         <span className="nav-link__text">Dashboard</span>
       </NavLink>
-      <NavLink to="/plan" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+      <NavLink
+        to="/plan"
+        className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}
+      >
         <span className="nav-link__num">▦</span>
         <span className="nav-link__text">Study plan</span>
       </NavLink>
-      <NavLink to="/projects" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+      <NavLink
+        to="/projects"
+        className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}
+      >
         <span className="nav-link__num">✦</span>
         <span className="nav-link__text">Capstone projects</span>
       </NavLink>
@@ -62,7 +79,7 @@ export function Sidebar() {
           <span>Total lab progress</span>
           <span className="sidebar-progress__pct">{pct}%</span>
         </div>
-        <div className={`progress${pct === 100 ? ' progress--green' : ''}`}>
+        <div className={`progress${pct === 100 ? " progress--green" : ""}`}>
           <div className="progress__bar" style={{ width: `${pct}%` }} />
         </div>
         <div className="sidebar-progress__sub">
@@ -82,32 +99,49 @@ export function Sidebar() {
 
       <div className="nav-group-label">Projects</div>
       {projects.map((proj) => {
-        const p = projectProgress(proj, tasks)
-        const dotClass = p.complete ? 'done' : p.ratio > 0 ? 'partial' : ''
+        const p = projectProgress(proj, tasks);
+        const dotClass = p.complete ? "done" : p.ratio > 0 ? "partial" : "";
         return (
           <NavLink
             key={proj.id}
             to={`/project/${proj.id}`}
-            className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+            className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}
           >
-            <span className="nav-link__num">{proj.track === 'spring' ? '🌱' : '☕'}</span>
+            <span className="nav-link__num">
+              {proj.track === "spring" ? "🌱" : "☕"}
+            </span>
             <span className="nav-link__text">{proj.title}</span>
             <span className={`nav-dot ${dotClass}`} />
           </NavLink>
-        )
+        );
       })}
 
       <div className="sidebar__footer">
         <button
           className="btn btn--ghost btn--sm"
-          style={{ width: '100%' }}
+          style={{ width: "100%" }}
           onClick={() => {
-            if (confirm('Reset all progress? This cannot be undone.')) reset()
+            if (confirm("Reset all progress? This cannot be undone.")) reset();
           }}
         >
           Reset progress
         </button>
       </div>
+      <div className="sidebar-user">
+        <div className="sidebar-user__info">
+          <span className="sidebar-user__avatar">
+            {user?.email?.[0]?.toUpperCase() ?? "?"}
+          </span>
+          <span className="sidebar-user__email">{user?.email}</span>
+        </div>
+        <button
+          className="btn btn--ghost btn--sm"
+          style={{ width: "100%" }}
+          onClick={() => signOut()}
+        >
+          Log out
+        </button>
+      </div>
     </aside>
-  )
+  );
 }

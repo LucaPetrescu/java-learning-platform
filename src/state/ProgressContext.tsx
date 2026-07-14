@@ -4,13 +4,17 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
+import { supabase } from '../utils/supabase/supabase'
+import { useAuth } from './AuthContext'
 
 // ---------------------------------------------------------------------------
-// Progress is persisted to localStorage so the user keeps their place across
-// sessions without any backend. We track:
+// Progress is persisted to Supabase (per-user `progress` row) when signed in,
+// and falls back to localStorage for guests browsing without an account.
+// We track:
 //   - completed exercises (the unit of lab work)
 //   - which theory sections have been marked read
 //   - completed project milestone tasks (the unit of capstone work)
@@ -42,7 +46,7 @@ interface ProgressContextValue {
 
 const empty: ProgressState = { exercises: {}, reading: {}, tasks: {} }
 
-function load(): ProgressState {
+function loadLocal(): ProgressState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return empty
@@ -57,6 +61,14 @@ function load(): ProgressState {
   }
 }
 
+function saveLocal(state: ProgressState) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+  } catch {
+    // storage full / disabled — non-fatal
+  }
+}
+
 const ProgressContext = createContext<ProgressContextValue | null>(null)
 
 /** Toggle a boolean key in a record, removing it when turning off. */
@@ -68,15 +80,67 @@ function toggled(map: Record<string, boolean>, id: string): Record<string, boole
 }
 
 export function ProgressProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<ProgressState>(load)
+  const { user } = useAuth()
+  const [state, setState] = useState<ProgressState>(empty)
+  const hydrated = useRef(false)
 
+  // Hydrate: from Supabase when signed in, from localStorage as a guest.
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
-    } catch {
-      // storage full / disabled — non-fatal
+    hydrated.current = false
+
+    if (!user) {
+      setState(loadLocal())
+      hydrated.current = true
+      return
     }
-  }, [state])
+
+    let cancelled = false
+
+    async function hydrate() {
+      const { data } = await supabase
+        .from('progress')
+        .select('exercises, reading, tasks')
+        .eq('user_id', user!.id)
+        .maybeSingle()
+
+      if (cancelled) return
+
+      if (data) {
+        setState({
+          exercises: data.exercises ?? {},
+          reading: data.reading ?? {},
+          tasks: data.tasks ?? {},
+        })
+      } else {
+        // First sign-in: migrate whatever was saved locally as a guest.
+        const local = loadLocal()
+        await supabase.from('progress').insert({ user_id: user!.id, ...local })
+        setState(local)
+      }
+      hydrated.current = true
+    }
+
+    hydrate()
+    return () => {
+      cancelled = true
+    }
+  }, [user])
+
+  // Persist: debounced upsert to Supabase, or localStorage as a guest.
+  useEffect(() => {
+    if (!hydrated.current) return
+
+    if (!user) {
+      saveLocal(state)
+      return
+    }
+
+    const timer = setTimeout(() => {
+      supabase.from('progress').upsert({ user_id: user.id, ...state })
+    }, 500)
+
+    return () => clearTimeout(timer)
+  }, [state, user])
 
   const toggleExercise = useCallback((id: string) => {
     setState((s) => ({ ...s, exercises: toggled(s.exercises, id) }))
